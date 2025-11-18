@@ -29,9 +29,9 @@ frame_width = 352
 frame_height = 288
 
 # Paths and files
-base_path = "C:\\Users\\gualt\\OneDrive - unige.it\\work\\education\\courses\\multimodal_systems\\2025-2026\\practice_works\\"
-video_path = "movement\\02_motion_tracking\\videos\\"
-model_path = "movement\\02_motion_tracking\\notebooks\\models\\"
+base_path = ""
+video_path = "02_motion_tracking/videos/"
+model_path = "02_motion_tracking/models/"
 video_name = "micro-dance.avi"
 live_input = False
 
