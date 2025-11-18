@@ -43,10 +43,10 @@ def stack_images_vertical(images, scale=1.0):
 
 
 # Constants
-base_path = "C:\\Users\\gualt\\OneDrive - unige.it\\work\\education\\courses\\multimodal_systems\\2025-2026\\practice_works\\"
-video_path = "movement\\01_background_segmentation\\videos\\"
+base_path = ""
+video_path = "01_background_segmentation/videos/"
 video_name = "micro-dance.avi"
-live_input = False
+live_input = True
 
 background = None
 first_frame_set = False

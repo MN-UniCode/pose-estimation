@@ -12,8 +12,8 @@ from sam2.build_sam import build_sam2_video_predictor
 
 using_video_fragment = True
 
-sam2_path_local = "C:/Users/gualt/OneDrive/Documents/GitHub/sam2"
-sample_videos_path = "C:/Users/gualt/OneDrive - unige.it/work/education/courses/multimodal_systems/2025-2026/practice_works/movement/01_background_segmentation/videos/"
+sam2_path_local = "sam2"
+sample_videos_path = "01_background_segmentation/videos/"
 
 def show_mask(mask, ax, obj_id=None, random_color=False):
     if random_color:
@@ -64,7 +64,7 @@ elif device.type == "mps":
 
 # Loading the SAM 2 video predictor
 sam2_checkpoint = sam2_path_local + "/checkpoints/sam2.1_hiera_large.pt"
-model_cfg = sam2_path_local + "/configs/sam2.1_hiera_l.yaml"
+model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
 
 predictor = build_sam2_video_predictor(model_cfg, sam2_checkpoint, device=device)
 
@@ -99,8 +99,8 @@ ann_obj_id = 1  # give a unique id to each object we interact with (it can be an
 
 if using_video_fragment:
     ann_frame_idx = 0  # the frame index we interact with
-    # Let's add a positive click at (x, y) = (225, 130) to get started
-    points = np.array([[215, 130]], dtype=np.float32)
+    # Let's add a positive click at (x, y) = (215, 130) to get started
+    points = np.array([[214, 85]], dtype=np.float32)
 else:
     ann_frame_idx = 80  # the frame index we interact with
     # Let's add a positive click at (x, y) = (185, 120) (center of the image) to get started

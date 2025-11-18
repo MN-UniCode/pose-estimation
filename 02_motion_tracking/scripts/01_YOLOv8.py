@@ -30,12 +30,12 @@ def get_centroid(mask, x1, y1, x2, y2):
     return centroid
 
 # Constants
-base_path = "C:\\Users\\gualt\\OneDrive - unige.it\\work\\education\\courses\\multimodal_systems\\2025-2026\\practice_works\\"
-video_path = "movement\\02_motion_tracking\\videos\\"
+base_path = ""
+video_path = "02_motion_tracking/videos/"
 video_name = "micro-dance.avi"
 live_input = False
 
-model = "yolov8n-seg.pt"
+model = "02_motion_tracking/models/yolov8n-seg.pt"
 person_class_id = 0
 confidence_threshold = 0.3
 

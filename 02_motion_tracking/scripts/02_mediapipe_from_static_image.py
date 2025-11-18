@@ -8,13 +8,16 @@ from mediapipe import solutions
 from mediapipe.framework.formats import landmark_pb2
 import matplotlib.pyplot as plt
 
-model_path = 'C://Users//gualt//OneDrive - unige.it//work//education//courses//multimodal_systems//2025-2026//practice_works//movement//02_motion_tracking//notebooks//models//'
-image_path = 'C://Users//gualt//OneDrive - unige.it//work//education//courses//multimodal_systems//2025-2026//practice_works//movement//02_motion_tracking//videos//'
+model_path = '02_motion_tracking/models/'
+image_path = '02_motion_tracking/videos/'
 
 # DEFINING A FUNCTION TO DRAW BODY LANDMARKS
 def draw_landmarks_on_image(rgb_image, detection_result):
   pose_landmarks_list = detection_result.pose_landmarks
   annotated_image = np.copy(rgb_image)
+
+  if annotated_image.shape[2] == 4:
+    annotated_image = cv2.cvtColor(annotated_image, cv2.COLOR_RGBA2RGB)
 
   # Loop through the detected poses to visualize.
   for idx in range(len(pose_landmarks_list)):
