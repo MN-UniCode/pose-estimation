@@ -51,8 +51,6 @@ max_ke = 12.0  # Adjust based on expected max kinetic energy
 class Kinetix:
     def __init__(self):
         self.prev_detection = None
-        self.prev_time = None
-        self.curr_time = None
 
         self.maxlen = fps * plot_window_seconds
 
@@ -64,17 +62,74 @@ class Kinetix:
             for name in self.group_names
         }
 
+    def __call__(self, detector, filter, cap, max_ke = 12.0, use_anthropometric_tables = False):
+        # Checking for possible errors
+        if not cap.isOpened():
+            print("Error in opening the video stream.")
+            sys.exit()
+        
+        drawer = Drawer()
+
+        while True:
+            # Getting current frame
+            success, current_frame = cap.read()
+            if not success:
+                break
+
+            # Resizing it
+            current_frame = cv2.resize(current_frame, (frame_width, frame_height))
+
+            # Running detection
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=current_frame)
+            detection_result = detector.detect(mp_image)
+
+            # Getting current time and coordinates of the selected landmark
+            curr_time = time.time()
+
+            # Computing kinetic energy
+            if use_anthropometric_tables:
+                masses_vector = masses.create_mass_vector(total_mass)
+            else:
+                masses_vector = None
+
+            ke = self.compute_components_kinetic_energy(detection_result, prev_detection,
+                                        prev_time, curr_time, masses_vector, filter)
+            if ke is not None:
+                for name in self.group_names:
+                    self.ke_histories[f'{name}_ke'] = ke[f'{name}_ke'] 
+            else:
+                for name in self.group_names:
+                    self.ke_histories[f'{name}_ke'] = 0.0
+
+            # Updating
+            prev_detection = detection_result
+            prev_time = curr_time
+
+            # Plotting
+            annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
+            ke_graph_image = drawer.draw_cv_barchart(self.ke_histories, annotated_image.shape[1], annotated_image.shape[0], max_ke)
+            combined = drawer.stack_images_horizontal([annotated_image, ke_graph_image])
+
+            # Showing the result
+            cv2.imshow("Landmarks overall kinetic energy", combined)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        # Cleanup
+        cap.release()
+        cv2.destroyAllWindows()
+
     # Computing the first-order derivative
-    def first_order_derivative(self, curr_value, prev_value):
+    def first_order_derivative(self, curr_value, prev_value, curr_time, prev_time):
         result = None
         if curr_value is not None and prev_value is not None and curr_time is not None and prev_time is not None:
-            dt = self.curr_time - self.prev_time
+            dt = curr_time - prev_time
             result = (curr_value - prev_value) / dt
         return result
 
     def compute_components_kinetic_energy(self, current_detection_result, previous_detection_result,
-                                          masses=None,
-                                          apply_filtering=False, velocity_filter=None):
+                                          curr_time, prev_time,
+                                          masses=None, velocity_filter=None):
         # Ensure landmarks exist
         if detection_result is None or previous_detection_result is None:
             return None
@@ -96,12 +151,13 @@ class Kinetix:
         # Compute velocity vectors for each landmark
         velocities = np.array([
             self.first_order_derivative(np.array([curr_lm.x, curr_lm.y, curr_lm.z]),
-                                   np.array([prev_lm.x, prev_lm.y, prev_lm.z]))
+                                        np.array([prev_lm.x, prev_lm.y, prev_lm.z]), 
+                                        curr_time, prev_time)
             for curr_lm, prev_lm in zip(current_landmarks, previous_landmarks)
         ])
 
         # Optional filtering
-        if apply_filtering and velocity_filter is not None:
+        if velocity_filter is not None:
             # Flatten velocities for filtering: (n_points * 3)
             v_flat = velocities.reshape(-1)
             # Filter one "sample" per channel (vectorized)
@@ -128,89 +184,132 @@ class Kinetix:
 
         return ke
 
-    def __call__(self, current_detection_result, previous_detection_result):
 
-        ke = self.compute_components_kinetic_energy(current_detection_result)
-        self.ke_histories
+class Drawer:
+    def __init__(self):
+        pass
 
-# === Auxiliary functions === #
+    # Drawing body landmarks
+    def draw_landmarks_on_image(self, rgb_image, detection_result):
+        pose_landmarks_list = detection_result.pose_landmarks
+        annotated_image = rgb_image.copy()
 
-# Drawing body landmarks
-def draw_landmarks_on_image(rgb_image, detection_result):
-    pose_landmarks_list = detection_result.pose_landmarks
-    annotated_image = rgb_image.copy()
+        # Loop through the detected poses to visualize
+        if len(pose_landmarks_list) > 0:
+            for idx in range(len(pose_landmarks_list)):
+                pose_landmarks = pose_landmarks_list[idx]
 
-    # Loop through the detected poses to visualize
-    if len(pose_landmarks_list) > 0:
-        for idx in range(len(pose_landmarks_list)):
-            pose_landmarks = pose_landmarks_list[idx]
+                # Draw the pose landmarks
+                pose_landmarks_proto = landmark_pb2.NormalizedLandmarkList() # this has just x,y,z and not visibility and presence
+                pose_landmarks_proto.landmark.extend([
+                    landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in pose_landmarks
+                ])
+                solutions.drawing_utils.draw_landmarks(
+                    annotated_image,
+                    pose_landmarks_proto,
+                    solutions.pose.POSE_CONNECTIONS,
+                    solutions.drawing_styles.get_default_pose_landmarks_style())
 
-            # Draw the pose landmarks
-            pose_landmarks_proto = landmark_pb2.NormalizedLandmarkList() # this has just x,y,z and not visibility and presence
-            pose_landmarks_proto.landmark.extend([
-                landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in pose_landmarks
-            ])
-            solutions.drawing_utils.draw_landmarks(
-                annotated_image,
-                pose_landmarks_proto,
-                solutions.pose.POSE_CONNECTIONS,
-                solutions.drawing_styles.get_default_pose_landmarks_style())
+        return annotated_image
+    
+    def draw_cv_barchart(self, width=640, height=480, max_value=200):
+        graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # White canvas
 
-    return annotated_image
+        margin_left = 60
+        margin_bottom = 50
+        margin_top = 20
 
+        bar_width = int((width - margin_left - 20) / len(self.group_names))
+        
+        # Draw axes
+        cv2.line(graph, (margin_left, margin_top), (margin_left, height - margin_bottom), (0, 0, 0), 2)
+        cv2.line(graph, (margin_left, height - margin_bottom), (width - 10, height - margin_bottom), (0, 0, 0), 2)
 
-# Drawing a graph over time using OpenCV
-def draw_cv_graph(history, width=640, height=480, max_value=2.0, fps=25, window_length=5, y_label="y"):
-    graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # white background
+        # Extract last KE values for each group
+        values = []
+        for name in self.group_names:
+            hist = self.ke_histories[f"{name}_ke"]
+            values.append(hist[-1] if len(hist) > 0 else 0.0)
 
-    # Axes
-    cv2.line(graph, (50, 0), (50, height - 40), (0, 0, 0), 1)  # y-axis
-    cv2.line(graph, (50, height - 40), (width, height - 40), (0, 0, 0), 1)  # x-axis
+        # Plot bars
+        for i, (name, value) in enumerate(zip(self.group_names, values)):
+            bar_height = int((min(value, max_value) / max_value) * (height - margin_bottom - margin_top))
+            x1 = margin_left + i * bar_width + 5
+            y1 = height - margin_bottom - bar_height
+            x2 = x1 + bar_width - 10
+            y2 = height - margin_bottom
 
-    # Y-axis labels (fixed range)
-    for i in range(5):
-        y_value = max_value * i / 4
-        y_pos = int(height - 40 - (y_value / max_value) * (height - 50))
-        label = f"{y_value:.1f}"
-        cv2.putText(graph, label, (5, y_pos + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+            cv2.rectangle(graph, (x1, y1), (x2, y2), (0, 122, 255), -1)
 
-    # X-axis time ticks
-    history_length = fps * window_length
-    seconds_range = history_length / fps
-    tick_px = (width - 50) / seconds_range
+            # Label group name
+            cv2.putText(graph, name.replace("_", ""),
+                        (x1, height - margin_bottom + 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,0), 1)
 
-    for i in range(int(seconds_range) + 1):
-        x = int(50 + i * tick_px)
-        cv2.line(graph, (x, height - 40), (x, height - 35), (0, 0, 0), 1)
-        cv2.putText(graph, f"{i}s", (x - 10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+            # Label value
+            cv2.putText(graph, f"{value:.1f}",
+                        (x1, y1 - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,0), 1)
 
-    # Plot line
-    if len(history) >= 2:
-        for i in range(1, len(history)):
-            x1 = int(50 + (i - 1) / history_length * (width - 50))
-            x2 = int(50 + i / history_length * (width - 50))
+        # Y-axis label
+        cv2.putText(graph, "K.E.", (5, margin_top), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
 
-            y1 = int(height - 40 - (min(history[i - 1], max_value) / max_value) * (height - 50))
-            y2 = int(height - 40 - (min(history[i], max_value) / max_value) * (height - 50))
-
-            cv2.line(graph, (x1, y1), (x2, y2), (0, 0, 255), 2)
-
-    # Axis labels
-    cv2.putText(graph, y_label, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-    cv2.putText(graph, "Time (s)", (width // 2, height - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-
-    return graph
+        return graph
 
 
-# Stack OpenCV images horizontally
-def stack_images_horizontal(images, scale=1.0):
-    resized_images = []
-    for img in images:
-        if len(img.shape) == 2:  # grayscale
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-        img = cv2.resize(img, None, fx=scale, fy=scale)
-        resized_images.append(img)
-    return cv2.hconcat(resized_images)
+
+    # Drawing a graph over time using OpenCV
+    def draw_cv_graph(self, history, width=640, height=480, max_value=2.0, fps=25, window_length=5, y_label="y"):
+        graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # white background
+
+        # Axes
+        cv2.line(graph, (50, 0), (50, height - 40), (0, 0, 0), 1)  # y-axis
+        cv2.line(graph, (50, height - 40), (width, height - 40), (0, 0, 0), 1)  # x-axis
+
+        # Y-axis labels (fixed range)
+        for i in range(5):
+            y_value = max_value * i / 4
+            y_pos = int(height - 40 - (y_value / max_value) * (height - 50))
+            label = f"{y_value:.1f}"
+            cv2.putText(graph, label, (5, y_pos + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+
+        # X-axis time ticks
+        history_length = fps * window_length
+        seconds_range = history_length / fps
+        tick_px = (width - 50) / seconds_range
+
+        for i in range(int(seconds_range) + 1):
+            x = int(50 + i * tick_px)
+            cv2.line(graph, (x, height - 40), (x, height - 35), (0, 0, 0), 1)
+            cv2.putText(graph, f"{i}s", (x - 10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+
+        # Plot line
+        if len(history) >= 2:
+            for i in range(1, len(history)):
+                x1 = int(50 + (i - 1) / history_length * (width - 50))
+                x2 = int(50 + i / history_length * (width - 50))
+
+                y1 = int(height - 40 - (min(history[i - 1], max_value) / max_value) * (height - 50))
+                y2 = int(height - 40 - (min(history[i], max_value) / max_value) * (height - 50))
+
+                cv2.line(graph, (x1, y1), (x2, y2), (0, 0, 255), 2)
+
+        # Axis labels
+        cv2.putText(graph, y_label, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
+        cv2.putText(graph, "Time (s)", (width // 2, height - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
+
+        return graph
+
+
+    # Stack OpenCV images horizontally
+    def stack_images_horizontal(self, images, scale=1.0):
+        resized_images = []
+        for img in images:
+            if len(img.shape) == 2:  # grayscale
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            img = cv2.resize(img, None, fx=scale, fy=scale)
+            resized_images.append(img)
+        return cv2.hconcat(resized_images)
 
 
 # === Main === #
