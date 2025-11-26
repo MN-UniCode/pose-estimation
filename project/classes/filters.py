@@ -34,9 +34,6 @@ class Butterworth:
         return y[0]
     
 
-    import numpy as np
-from scipy.signal import butter, sosfilt_zi
-
 class ButterworthMultichannel:
     """
     Vectorized Butterworth filter with independent state buffers for multiple channels.
