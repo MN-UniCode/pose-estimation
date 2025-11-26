@@ -3,8 +3,8 @@ import numpy as np
 
 # Mediapipe
 import mediapipe as mp
-from project.classes.body_landmarks import BodyLandmarkGroups
-import project.utility.masses as masses
+from .body_landmarks import BodyLandmarkGroups
+import utility.masses as masses
 
 # Utilities and data structures
 import time
@@ -14,7 +14,6 @@ from .drawer import Drawer
 
 class Kinetix:
     def __init__(self, fps, plot_window_seconds, frame_width, frame_height, total_mass):
-        self.prev_detection = None
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.total_mass = total_mass
@@ -36,6 +35,9 @@ class Kinetix:
             sys.exit()
         
         drawer = Drawer()
+
+        prev_detection = None
+        prev_time = None
 
         while True:
             # Getting current frame
@@ -63,10 +65,10 @@ class Kinetix:
                                         prev_time, curr_time, masses_vector, filter)
             if ke is not None:
                 for name in self.group_names:
-                    self.ke_histories[f'{name}_ke'] = ke[f'{name}_ke'] 
+                    self.ke_histories[f'{name}_ke'].append(ke[f'{name}_ke'])
             else:
                 for name in self.group_names:
-                    self.ke_histories[f'{name}_ke'] = 0.0
+                    self.ke_histories[f'{name}_ke'].append(0.0)
 
             # Updating
             prev_detection = detection_result
@@ -74,7 +76,7 @@ class Kinetix:
 
             # Plotting
             annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
-            ke_graph_image = drawer.draw_cv_barchart(self.ke_histories, annotated_image.shape[1], annotated_image.shape[0], max_ke)
+            ke_graph_image = drawer.draw_cv_barchart(self.ke_histories, self.group_names, annotated_image.shape[1], annotated_image.shape[0], max_ke)
             combined = drawer.stack_images_horizontal([annotated_image, ke_graph_image])
 
             # Showing the result
@@ -143,6 +145,8 @@ class Kinetix:
         l_leg_v = velocities[BodyLandmarkGroups.LEFT_LEG]
 
         variables = [whole_v, upper_v, lower_v, r_arm_v, l_arm_v, r_leg_v, l_leg_v]
+
+        # TODO: group the masses to compute the kinetic energy of each component
 
         ke = {
             f"{name}_ke": 0.5 * np.sum(masses * np.sum(velocity ** 2, axis=1))

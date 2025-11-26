@@ -3,10 +3,10 @@ import cv2
 # Mediapipe
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from project.classes.body_landmarks import BodyLandmarks
+from classes.body_landmarks import BodyLandmarks
 
 # Filters
-from project.classes.filters import ButterworthMultichannel
+from classes.filters import ButterworthMultichannel
 
 # Utilities and data structures
 from classes.kinetix import Kinetix

@@ -34,14 +34,14 @@ class Drawer:
 
         return annotated_image
     
-    def draw_cv_barchart(self, width=640, height=480, max_value=200):
+    def draw_cv_barchart(self, ke_histories, group_names, width=640, height=480, max_value=200):
         graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # White canvas
 
         margin_left = 60
         margin_bottom = 50
         margin_top = 20
 
-        bar_width = int((width - margin_left - 20) / len(self.group_names))
+        bar_width = int((width - margin_left - 20) / len(group_names))
         
         # Draw axes
         cv2.line(graph, (margin_left, margin_top), (margin_left, height - margin_bottom), (0, 0, 0), 2)
@@ -49,12 +49,12 @@ class Drawer:
 
         # Extract last KE values for each group
         values = []
-        for name in self.group_names:
-            hist = self.ke_histories[f"{name}_ke"]
+        for name in group_names:
+            hist = ke_histories[f"{name}_ke"]
             values.append(hist[-1] if len(hist) > 0 else 0.0)
 
         # Plot bars
-        for i, (name, value) in enumerate(zip(self.group_names, values)):
+        for i, (name, value) in enumerate(zip(group_names, values)):
             bar_height = int((min(value, max_value) / max_value) * (height - margin_bottom - margin_top))
             x1 = margin_left + i * bar_width + 5
             y1 = height - margin_bottom - bar_height
@@ -77,8 +77,6 @@ class Drawer:
         cv2.putText(graph, "K.E.", (5, margin_top), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
 
         return graph
-
-
 
     # Drawing a graph over time using OpenCV
     def draw_cv_graph(self, history, width=640, height=480, max_value=2.0, fps=25, window_length=5, y_label="y"):
@@ -121,7 +119,6 @@ class Drawer:
         cv2.putText(graph, "Time (s)", (width // 2, height - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
 
         return graph
-
 
     # Stack OpenCV images horizontally
     def stack_images_horizontal(self, images, scale=1.0):
