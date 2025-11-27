@@ -39,6 +39,8 @@ class Kinetix:
         prev_detection = None
         prev_time = None
 
+        group_plot = self.group_names
+
         while True:
             # Getting current frame
             success, current_frame = cap.read()
@@ -56,18 +58,16 @@ class Kinetix:
             curr_time = time.time()
 
             # Computing kinetic energy
-            if use_anthropometric_tables:
-                masses_vector = masses.create_mass_vector(self.total_mass)
-            else:
-                masses_vector = None
+            masses_vector = masses.create_mass_vector(self.total_mass)
+            masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables)
 
             ke = self.compute_components_kinetic_energy(detection_result, prev_detection,
-                                        prev_time, curr_time, masses_vector, filter)
+                                        prev_time, curr_time, masses_dict, filter)
             if ke is not None:
-                for name in self.group_names:
+                for name in group_plot:
                     self.ke_histories[f'{name}_ke'].append(ke[f'{name}_ke'])
             else:
-                for name in self.group_names:
+                for name in group_plot:
                     self.ke_histories[f'{name}_ke'].append(0.0)
 
             # Updating
@@ -76,13 +76,24 @@ class Kinetix:
 
             # Plotting
             annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
-            ke_graph_image = drawer.draw_cv_barchart(self.ke_histories, self.group_names, annotated_image.shape[1], annotated_image.shape[0], max_ke)
+            ke_graph_image = drawer.draw_cv_barchart(self.ke_histories, group_plot, annotated_image.shape[1], annotated_image.shape[0], max_ke)
             combined = drawer.stack_images_horizontal([annotated_image, ke_graph_image])
 
             # Showing the result
             cv2.imshow("Landmarks overall kinetic energy", combined)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+
+            key = cv2.waitKey(1) & 0xFF
+
+            if key == ord('q'):
                 break
+            elif key == ord('r'):
+                group_plot = ['r_arm', 'r_leg']
+            elif key == ord('l'):
+                group_plot = ['l_arm', 'l_leg']
+            elif key == ord('w'):
+                group_plot = ['whole', 'upper', 'lower']
+            elif key == ord('b'):
+                group_plot = self.group_names
 
         # Cleanup
         cap.release()
@@ -98,7 +109,7 @@ class Kinetix:
 
     def compute_components_kinetic_energy(self, current_detection_result, previous_detection_result,
                                           curr_time, prev_time,
-                                          masses=None, velocity_filter=None):
+                                          masses, velocity_filter=None):
         # Ensure landmarks exist
         if current_detection_result is None or previous_detection_result is None:
             return None
@@ -114,8 +125,6 @@ class Kinetix:
         previous_landmarks = previous_detection_result.pose_landmarks[0]
 
         n_landmarks = len(current_landmarks)
-        if masses is None:
-            masses = np.ones(n_landmarks)
 
         # Compute velocity vectors for each landmark
         velocities = np.array([
@@ -146,10 +155,8 @@ class Kinetix:
 
         variables = [whole_v, upper_v, lower_v, r_arm_v, l_arm_v, r_leg_v, l_leg_v]
 
-        # TODO: group the masses to compute the kinetic energy of each component
-
         ke = {
-            f"{name}_ke": 0.5 * np.sum(masses * np.sum(velocity ** 2, axis=1))
+            f"{name}_ke": 0.5 * np.sum(masses[f"{name}_m"] * np.sum(velocity ** 2, axis=1))
             for name, velocity in zip(self.group_names, variables)
         }
 

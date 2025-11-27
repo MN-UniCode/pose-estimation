@@ -1,4 +1,5 @@
 import numpy as np
+from classes.body_landmarks import BodyLandmarkGroups
 
 # Anthropometric mass fractions for body segments (% of total body mass)
 MASS_FRACTIONS = {
@@ -30,6 +31,8 @@ LANDMARK_GROUPS = {
 
 def create_mass_vector(body_mass):
     masses = np.zeros(33)
+    if body_mass is None:
+        return masses
     for segment, indices in LANDMARK_GROUPS.items():
         fraction = MASS_FRACTIONS.get(segment, 0)
         segment_mass = body_mass * fraction
@@ -37,3 +40,28 @@ def create_mass_vector(body_mass):
         for idx in indices:
             masses[idx] += per_landmark_mass
     return masses
+
+def create_mass_dict(masses, group_names, use_table):
+    masses_dict = {
+        f"{name}_m": []
+        for name in group_names
+    }
+
+    if use_table is not None:
+        masses_dict['whole_m'].append(masses)
+        masses_dict['upper_m'].append(masses[BodyLandmarkGroups.UPPER_BODY])
+        masses_dict['lower_m'].append(masses[BodyLandmarkGroups.LOWER_BODY])
+        masses_dict['r_arm_m'].append(masses[BodyLandmarkGroups.RIGHT_ARM])
+        masses_dict['l_arm_m'].append(masses[BodyLandmarkGroups.LEFT_ARM])
+        masses_dict['r_leg_m'].append(masses[BodyLandmarkGroups.RIGHT_LEG])
+        masses_dict['l_leg_m'].append(masses[BodyLandmarkGroups.LEFT_LEG])
+    else:
+        masses_dict['whole_m'].append(np.ones(len(BodyLandmarkGroups.ALL)))
+        masses_dict['upper_m'].append(np.ones(len(BodyLandmarkGroups.UPPER_BODY)))
+        masses_dict['lower_m'].append(np.ones(len(BodyLandmarkGroups.LOWER_BODY)))
+        masses_dict['r_arm_m'].append(np.ones(len(BodyLandmarkGroups.RIGHT_ARM)))
+        masses_dict['l_arm_m'].append(np.ones(len(BodyLandmarkGroups.LEFT_ARM)))
+        masses_dict['r_leg_m'].append(np.ones(len(BodyLandmarkGroups.RIGHT_LEG)))
+        masses_dict['l_leg_m'].append(np.ones(len(BodyLandmarkGroups.LEFT_LEG)))
+
+    return masses_dict

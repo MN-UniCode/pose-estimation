@@ -13,10 +13,10 @@ from classes.kinetix import Kinetix
 
 
 # Kinetic energy computation
-use_anthropometric_tables = False
+use_anthropometric_tables = True
 total_mass = 67
-frame_width = 352
-frame_height = 288
+frame_width = 1920
+frame_height = 1080
 
 # Paths and files
 base_path = ""
@@ -26,17 +26,17 @@ video_name = ""
 live_input = True
 
 # Filtering
-fps = 25
+fps = 18
 cutoff = 3.0
 order = 2
 
 # Plotting
 plot_window_seconds = 5
-max_ke = 12.0 
+max_ke = 50.0
 
 
 # Creating a PoseLandmarker object
-base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
+base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_full.task')
 options = vision.PoseLandmarkerOptions(
     base_options=base_options,
     output_segmentation_masks=True)
