@@ -20,23 +20,23 @@ frame_height = 1080
 
 # Paths and files
 base_path = ""
-video_path = ""
+video_path = "03_low_level_features/videos/"
 model_path = "project/models/"
-video_name = ""
-live_input = True
+video_name = "micro-dance.avi"
+live_input = False
 
 # Filtering
-fps = 18
+fps = 25
 cutoff = 3.0
 order = 2
 
 # Plotting
 plot_window_seconds = 5
-max_ke = 50.0
+max_ke = 15.0
 
 
 # Creating a PoseLandmarker object
-base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_full.task')
+base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
 options = vision.PoseLandmarkerOptions(
     base_options=base_options,
     output_segmentation_masks=True)

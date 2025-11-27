@@ -34,12 +34,15 @@ class Drawer:
 
         return annotated_image
     
-    def draw_cv_barchart(self, ke_histories, group_names, width=640, height=480, max_value=200):
+    def draw_cv_barchart(self, ke, group_names, width=640, height=480, max_value=200):
         graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # White canvas
 
-        margin_left = 60
-        margin_bottom = 50
+        margin_left = 100
+        margin_bottom = 60
         margin_top = 20
+
+        font_scale = 1.5
+        thickness = 2
 
         bar_width = int((width - margin_left - 20) / len(group_names))
         
@@ -50,8 +53,8 @@ class Drawer:
         # Extract last KE values for each group
         values = []
         for name in group_names:
-            hist = ke_histories[f"{name}_ke"]
-            values.append(hist[-1] if len(hist) > 0 else 0.0)
+            hist = ke[f"{name}_ke"]
+            values.append(hist)
 
         # Plot bars
         for i, (name, value) in enumerate(zip(group_names, values)):
@@ -65,60 +68,34 @@ class Drawer:
 
             # Label group name
             cv2.putText(graph, name.replace("_", ""),
-                        (x1, height - margin_bottom + 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,0), 1)
+                        (x1, height - margin_bottom + 47),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,0), thickness)
 
             # Label value
             cv2.putText(graph, f"{value:.1f}",
                         (x1, y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,0), thickness)
 
         # Y-axis label
-        cv2.putText(graph, "K.E.", (5, margin_top), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
+        cv2.putText(graph, "K.E.", (5, margin_top + 20), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (50, 50, 50), thickness)
 
         return graph
 
-    # Drawing a graph over time using OpenCV
-    def draw_cv_graph(self, history, width=640, height=480, max_value=2.0, fps=25, window_length=5, y_label="y"):
-        graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # white background
+    def create_text_banner(self, text, width=640, height=140, bg_color=(255, 255, 255), text_color=(0, 0, 0)):
+        banner = np.ones((height, width, 3), dtype=np.uint8)
+        banner[:] = bg_color
 
-        # Axes
-        cv2.line(graph, (50, 0), (50, height - 40), (0, 0, 0), 1)  # y-axis
-        cv2.line(graph, (50, height - 40), (width, height - 40), (0, 0, 0), 1)  # x-axis
+        # Center text
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        scale = 2
+        thickness = 3
+        text_size = cv2.getTextSize(text, font, scale, thickness)[0]
 
-        # Y-axis labels (fixed range)
-        for i in range(5):
-            y_value = max_value * i / 4
-            y_pos = int(height - 40 - (y_value / max_value) * (height - 50))
-            label = f"{y_value:.1f}"
-            cv2.putText(graph, label, (5, y_pos + 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+        x = (width - text_size[0]) // 2
+        y = (height + text_size[1]) // 2
 
-        # X-axis time ticks
-        history_length = fps * window_length
-        seconds_range = history_length / fps
-        tick_px = (width - 50) / seconds_range
-
-        for i in range(int(seconds_range) + 1):
-            x = int(50 + i * tick_px)
-            cv2.line(graph, (x, height - 40), (x, height - 35), (0, 0, 0), 1)
-            cv2.putText(graph, f"{i}s", (x - 10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
-
-        # Plot line
-        if len(history) >= 2:
-            for i in range(1, len(history)):
-                x1 = int(50 + (i - 1) / history_length * (width - 50))
-                x2 = int(50 + i / history_length * (width - 50))
-
-                y1 = int(height - 40 - (min(history[i - 1], max_value) / max_value) * (height - 50))
-                y2 = int(height - 40 - (min(history[i], max_value) / max_value) * (height - 50))
-
-                cv2.line(graph, (x1, y1), (x2, y2), (0, 0, 255), 2)
-
-        # Axis labels
-        cv2.putText(graph, y_label, (5, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-        cv2.putText(graph, "Time (s)", (width // 2, height - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-
-        return graph
+        cv2.putText(banner, text, (x, y), font, scale, text_color, thickness)
+        return banner
 
     # Stack OpenCV images horizontally
     def stack_images_horizontal(self, images, scale=1.0):

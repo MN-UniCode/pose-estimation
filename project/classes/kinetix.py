@@ -41,6 +41,8 @@ class Kinetix:
 
         group_plot = self.group_names
 
+        previous_message = ""
+
         while True:
             # Getting current frame
             success, current_frame = cap.read()
@@ -63,12 +65,13 @@ class Kinetix:
 
             ke = self.compute_components_kinetic_energy(detection_result, prev_detection,
                                         prev_time, curr_time, masses_dict, filter)
-            if ke is not None:
-                for name in group_plot:
-                    self.ke_histories[f'{name}_ke'].append(ke[f'{name}_ke'])
-            else:
-                for name in group_plot:
-                    self.ke_histories[f'{name}_ke'].append(0.0)
+
+            for name in group_plot:
+                self.ke_histories[f'{name}_ke'].append(ke[f'{name}_ke'])
+
+            message = self.compare_kinetic_energy(ke)
+            if message != "":
+                previous_message = message
 
             # Updating
             prev_detection = detection_result
@@ -76,11 +79,16 @@ class Kinetix:
 
             # Plotting
             annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
-            ke_graph_image = drawer.draw_cv_barchart(self.ke_histories, group_plot, annotated_image.shape[1], annotated_image.shape[0], max_ke)
+            ke_graph_image = drawer.draw_cv_barchart(ke, group_plot, annotated_image.shape[1], annotated_image.shape[0], max_ke)
+
             combined = drawer.stack_images_horizontal([annotated_image, ke_graph_image])
 
+            text_banner = drawer.create_text_banner(previous_message, width=ke_graph_image.shape[1] + annotated_image.shape[1])
+
+            final = cv2.vconcat([combined, text_banner])
+
             # Showing the result
-            cv2.imshow("Landmarks overall kinetic energy", combined)
+            cv2.imshow("Landmarks overall kinetic energy", final)
 
             key = cv2.waitKey(1) & 0xFF
 
@@ -110,15 +118,20 @@ class Kinetix:
     def compute_components_kinetic_energy(self, current_detection_result, previous_detection_result,
                                           curr_time, prev_time,
                                           masses, velocity_filter=None):
+        ke = {
+            f"{name}_ke": 0.0
+            for name in self.group_names
+        }
+
         # Ensure landmarks exist
         if current_detection_result is None or previous_detection_result is None:
-            return None
+            return ke
 
         if previous_detection_result.pose_landmarks is None or len(previous_detection_result.pose_landmarks) == 0:
-            return None
+            return ke
 
         if current_detection_result.pose_landmarks is None or len(current_detection_result.pose_landmarks) == 0:
-            return None
+            return ke
 
         # Use only the first detected person
         current_landmarks = current_detection_result.pose_landmarks[0]
@@ -155,9 +168,28 @@ class Kinetix:
 
         variables = [whole_v, upper_v, lower_v, r_arm_v, l_arm_v, r_leg_v, l_leg_v]
 
-        ke = {
-            f"{name}_ke": 0.5 * np.sum(masses[f"{name}_m"] * np.sum(velocity ** 2, axis=1))
-            for name, velocity in zip(self.group_names, variables)
-        }
+        for name, velocity in zip(self.group_names, variables):
+            ke[f"{name}_ke"] = 0.5 * np.sum(masses[f"{name}_m"] * np.sum(velocity ** 2, axis=1))
 
         return ke
+
+    def compare_kinetic_energy(self, ke, dominance_ratio=3):
+        relevant_groups = {
+            "right arm": ke["r_arm_ke"],
+            "left arm": ke["l_arm_ke"],
+            "right leg": ke["r_leg_ke"],
+            "left leg": ke["l_leg_ke"]
+        }
+
+        dominant_group = max(relevant_groups, key=relevant_groups.get)
+        dominant_value = relevant_groups[dominant_group]
+
+        other_values = [v for k, v in relevant_groups.items() if k != dominant_group]
+
+        if all(v == 0 for v in other_values):
+            return ""
+
+        if all(dominant_value > dominance_ratio * v for v in other_values):
+            return f"The {dominant_group} is moving a lot."
+
+        return ""
