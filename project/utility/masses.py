@@ -48,20 +48,20 @@ def create_mass_dict(masses, group_names, use_table):
     }
 
     if use_table is not None:
-        masses_dict['whole_m'].append(masses)
-        masses_dict['upper_m'].append(masses[BodyLandmarkGroups.UPPER_BODY])
-        masses_dict['lower_m'].append(masses[BodyLandmarkGroups.LOWER_BODY])
-        masses_dict['r_arm_m'].append(masses[BodyLandmarkGroups.RIGHT_ARM])
-        masses_dict['l_arm_m'].append(masses[BodyLandmarkGroups.LEFT_ARM])
-        masses_dict['r_leg_m'].append(masses[BodyLandmarkGroups.RIGHT_LEG])
-        masses_dict['l_leg_m'].append(masses[BodyLandmarkGroups.LEFT_LEG])
+        masses_dict['whole_m']= masses
+        masses_dict['upper_m']= masses[BodyLandmarkGroups.UPPER_BODY]
+        masses_dict['lower_m']= masses[BodyLandmarkGroups.LOWER_BODY]
+        masses_dict['r_arm_m']= masses[BodyLandmarkGroups.RIGHT_ARM]
+        masses_dict['l_arm_m']= masses[BodyLandmarkGroups.LEFT_ARM]
+        masses_dict['r_leg_m']= masses[BodyLandmarkGroups.RIGHT_LEG]
+        masses_dict['l_leg_m']= masses[BodyLandmarkGroups.LEFT_LEG]
     else:
-        masses_dict['whole_m'].append(np.ones(len(BodyLandmarkGroups.ALL)))
-        masses_dict['upper_m'].append(np.ones(len(BodyLandmarkGroups.UPPER_BODY)))
-        masses_dict['lower_m'].append(np.ones(len(BodyLandmarkGroups.LOWER_BODY)))
-        masses_dict['r_arm_m'].append(np.ones(len(BodyLandmarkGroups.RIGHT_ARM)))
-        masses_dict['l_arm_m'].append(np.ones(len(BodyLandmarkGroups.LEFT_ARM)))
-        masses_dict['r_leg_m'].append(np.ones(len(BodyLandmarkGroups.RIGHT_LEG)))
-        masses_dict['l_leg_m'].append(np.ones(len(BodyLandmarkGroups.LEFT_LEG)))
+        masses_dict['whole_m'] = np.ones(len(BodyLandmarkGroups.ALL))
+        masses_dict['upper_m'] = np.ones(len(BodyLandmarkGroups.UPPER_BODY))
+        masses_dict['lower_m'] = np.ones(len(BodyLandmarkGroups.LOWER_BODY))
+        masses_dict['r_arm_m'] = np.ones(len(BodyLandmarkGroups.RIGHT_ARM))
+        masses_dict['l_arm_m'] = np.ones(len(BodyLandmarkGroups.LEFT_ARM))
+        masses_dict['r_leg_m'] = np.ones(len(BodyLandmarkGroups.RIGHT_LEG))
+        masses_dict['l_leg_m'] = np.ones(len(BodyLandmarkGroups.LEFT_LEG))
 
     return masses_dict

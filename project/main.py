@@ -26,8 +26,7 @@ video_name = "mauri.mp4"
 live_input = False
 
 # Filtering
-fps = 25
-cutoff = 3.0
+cutoff = 6.0
 order = 2
 
 # Plotting
@@ -38,12 +37,11 @@ max_ke = 15.0
 base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
 options = vision.PoseLandmarkerOptions(
     base_options=base_options,
+    running_mode=vision.RunningMode.VIDEO,
     output_segmentation_masks=True)
 detector = vision.PoseLandmarker.create_from_options(options)
 
 # === Pre-processing === #
-# Creating filter
-butterworth_filter = ButterworthMultichannel(len(BodyLandmarks) * 3, order, cutoff, btype='lowpass', fs=fps)
 
 # Selecting the input source (either a file or a video camera)
 if not live_input:
@@ -53,6 +51,11 @@ if not live_input:
 else:
     cap = cv2.VideoCapture(0)
     print("Processing webcam input.")
+
+fps = cap.get(cv2.CAP_PROP_FPS)
+
+# Creating filter
+butterworth_filter = ButterworthMultichannel(len(BodyLandmarks) * 3, order, cutoff, btype='lowpass', fs=fps)
 
 kinetix = Kinetix(fps, plot_window_seconds, frame_width, frame_height, total_mass)
 

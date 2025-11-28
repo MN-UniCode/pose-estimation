@@ -17,8 +17,9 @@ class Kinetix:
         self.frame_width = frame_width
         self.frame_height = frame_height
         self.total_mass = total_mass
+        self.fps = fps
 
-        self.maxlen = fps * plot_window_seconds
+        self.maxlen = int(fps) * plot_window_seconds
 
         self.group_names = ["whole", "upper", "lower", "r_arm", "l_arm", "r_leg", "l_leg"]
 
@@ -43,6 +44,22 @@ class Kinetix:
 
         previous_message = ""
 
+        dt_ms = 1000 / self.fps
+        timestamp_ms = 0
+
+        # Compute the masses
+        masses_vector = masses.create_mass_vector(self.total_mass)
+        masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables)
+
+        curr_time = time.time()
+
+        if prev_time is None:
+            dt_seconds = 1.0 / self.fps
+        else:
+            dt_seconds = curr_time - prev_time
+
+        prev_time = curr_time
+
         while True:
             # Getting current frame
             success, current_frame = cap.read()
@@ -56,17 +73,14 @@ class Kinetix:
 
             # Running detection
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=current_frame)
-            detection_result = detector.detect(mp_image)
+            detection_result = detector.detect_for_video(mp_image, int(timestamp_ms))
 
             # Getting current time and coordinates of the selected landmark
-            curr_time = time.time()
+            # curr_time = time.time()
 
             # Computing kinetic energy
-            masses_vector = masses.create_mass_vector(self.total_mass)
-            masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables)
-
             ke = self.compute_components_kinetic_energy(detection_result, prev_detection,
-                                        prev_time, curr_time, masses_dict, filter)
+                                        dt_seconds, masses_dict, filter)
 
             for name in group_plot:
                 self.ke_histories[f'{name}_ke'].append(ke[f'{name}_ke'])
@@ -77,17 +91,19 @@ class Kinetix:
 
             # Updating
             prev_detection = detection_result
-            prev_time = curr_time
+            # prev_time = curr_time
 
             # Plotting
             annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
-            ke_graph_image = drawer.draw_cv_barchart(ke, group_plot, annotated_image.shape[1], annotated_image.shape[0], max_ke)
+            ke_graph_image = drawer.draw_cv_barchart(ke, group_plot, height=annotated_image.shape[0], max_value=max_ke)
 
             combined = drawer.stack_images_horizontal([annotated_image, ke_graph_image])
 
             text_banner = drawer.create_text_banner(previous_message, width=ke_graph_image.shape[1] + annotated_image.shape[1])
 
             final = cv2.vconcat([combined, text_banner])
+
+            timestamp_ms += dt_ms
 
             # Showing the result
             cv2.imshow("Landmarks overall kinetic energy", final)
@@ -108,16 +124,16 @@ class Kinetix:
         cv2.destroyAllWindows()
 
     # Computing the first-order derivative
-    def first_order_derivative(self, curr_value, prev_value, curr_time, prev_time):
-        result = None
-        if curr_value is not None and prev_value is not None and curr_time is not None and prev_time is not None:
-            dt = curr_time - prev_time
-            result = (curr_value - prev_value) / dt
-        return result
+    # def first_order_derivative(self, curr_value, prev_value, curr_time, prev_time):
+    #     result = None
+    #     if curr_value is not None and prev_value is not None and curr_time is not None and prev_time is not None:
+    #         dt = curr_time - prev_time
+    #         result = (curr_value - prev_value) / dt
+    #     return result
 
     def compute_components_kinetic_energy(
             self, current_detection_result, previous_detection_result,
-            curr_time, prev_time, masses,
+            dt, masses,
             position_filter=None, max_speed=1):
 
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
@@ -139,10 +155,6 @@ class Kinetix:
         if position_filter is not None:
             curr_p = position_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
             prev_p = position_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
-
-        # dt in seconds
-        dt = curr_time - prev_time
-        if dt > 10: dt /= 1000.0  # If timestamps are in ms
 
         # Velocities
         velocities = (curr_p - prev_p) / dt
@@ -171,13 +183,13 @@ class Kinetix:
             if len(v) == 0: continue
 
             group_mass = masses[f"{name}_m"]
-            point_mass = np.sum(group_mass) / len(v)
+            # point_mass = np.sum(group_mass) / len(v)
 
-            ke[f"{name}_ke"] = 0.5 * point_mass * np.sum(np.sum(v ** 2, axis=1))
+            ke[f"{name}_ke"] = 0.5 * np.sum(group_mass * np.sum(v ** 2, axis=1))
 
         return ke
 
-    def compare_kinetic_energy(self, ke, dominance_ratio=10):
+    def compare_kinetic_energy(self, ke, dominance_ratio=2):
         relevant_groups = {
             "right arm": ke["r_arm_ke"],
             "left arm": ke["l_arm_ke"],
@@ -187,6 +199,8 @@ class Kinetix:
 
         dominant_group = max(relevant_groups, key=relevant_groups.get)
         dominant_value = relevant_groups[dominant_group]
+        if dominant_value < 0.1:
+            return ""
 
         other_values = [v for k, v in relevant_groups.items() if k != dominant_group]
 

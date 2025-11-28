@@ -58,9 +58,9 @@ class BodyLandmarkGroups:
     # Arms only
     # ARMS = [11, 12, 13, 14, 15, 16]
     # Right arm
-    RIGHT_ARM = [12, 14, 16]
+    RIGHT_ARM = [12, 14, 16, 18, 20, 22]
     # Left arm
-    LEFT_ARM = [11, 13, 15]
+    LEFT_ARM = [11, 13, 15, 17, 19, 21]
 
     # Legs only
     # LEGS = [23, 24, 25, 26, 27, 28]
