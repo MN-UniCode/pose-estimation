@@ -49,6 +49,8 @@ class Kinetix:
             if not success:
                 break
 
+            self.frame_height, self.frame_width, _ = current_frame.shape
+
             # Resizing it
             current_frame = cv2.resize(current_frame, (self.frame_width, self.frame_height))
 
@@ -94,10 +96,8 @@ class Kinetix:
 
             if key == ord('q'):
                 break
-            elif key == ord('r'):
-                group_plot = ['r_arm', 'r_leg']
             elif key == ord('l'):
-                group_plot = ['l_arm', 'l_leg']
+                group_plot = ['r_arm', 'r_leg', 'l_arm', 'l_leg']
             elif key == ord('w'):
                 group_plot = ['whole', 'upper', 'lower']
             elif key == ord('b'):
@@ -115,65 +115,69 @@ class Kinetix:
             result = (curr_value - prev_value) / dt
         return result
 
-    def compute_components_kinetic_energy(self, current_detection_result, previous_detection_result,
-                                          curr_time, prev_time,
-                                          masses, velocity_filter=None):
-        ke = {
-            f"{name}_ke": 0.0
-            for name in self.group_names
-        }
+    def compute_components_kinetic_energy(
+            self, current_detection_result, previous_detection_result,
+            curr_time, prev_time, masses,
+            position_filter=None, max_speed=1):
 
-        # Ensure landmarks exist
-        if current_detection_result is None or previous_detection_result is None:
+        ke = {f"{name}_ke": 0.0 for name in self.group_names}
+
+        # Validate
+        if (current_detection_result is None or previous_detection_result is None or
+                not current_detection_result.pose_world_landmarks or
+                not previous_detection_result.pose_world_landmarks):
             return ke
 
-        if previous_detection_result.pose_landmarks is None or len(previous_detection_result.pose_landmarks) == 0:
-            return ke
+        curr_lm = current_detection_result.pose_world_landmarks[0]
+        prev_lm = previous_detection_result.pose_world_landmarks[0]
 
-        if current_detection_result.pose_landmarks is None or len(current_detection_result.pose_landmarks) == 0:
-            return ke
+        # Positions - 33x3
+        curr_p = np.array([[lm.x, lm.y, lm.z] for lm in curr_lm])
+        prev_p = np.array([[lm.x, lm.y, lm.z] for lm in prev_lm])
 
-        # Use only the first detected person
-        current_landmarks = current_detection_result.pose_landmarks[0]
-        previous_landmarks = previous_detection_result.pose_landmarks[0]
+        # Filter POSITIONS, not velocities
+        if position_filter is not None:
+            curr_p = position_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
+            prev_p = position_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
 
-        n_landmarks = len(current_landmarks)
+        # dt in seconds
+        dt = curr_time - prev_time
+        if dt > 10: dt /= 1000.0  # If timestamps are in ms
 
-        # Compute velocity vectors for each landmark
-        velocities = np.array([
-            self.first_order_derivative(np.array([curr_lm.x, curr_lm.y, curr_lm.z]),
-                                        np.array([prev_lm.x, prev_lm.y, prev_lm.z]), 
-                                        curr_time, prev_time)
-            for curr_lm, prev_lm in zip(current_landmarks, previous_landmarks)
-        ])
+        # Velocities
+        velocities = (curr_p - prev_p) / dt
 
-        # Optional filtering
-        if velocity_filter is not None:
-            # Flatten velocities for filtering: (n_points * 3)
-            v_flat = velocities.reshape(-1)
-            # Filter one "sample" per channel (vectorized)
-            v_f = velocity_filter.filter(v_flat)
-            # Reshape the velocities as 3d array
-            velocities = v_f.reshape(n_landmarks, 3)
+        # Outlier removal
+        speed = np.linalg.norm(velocities, axis=1)
+        velocities[speed > max_speed] = 0
 
-        whole_v = velocities
-        upper_v = velocities[BodyLandmarkGroups.UPPER_BODY]
-        lower_v = velocities[BodyLandmarkGroups.LOWER_BODY]
+        # Remove body global translation (use midhip)
+        midhip_curr = (curr_p[23] + curr_p[24]) / 2
+        midhip_prev = (prev_p[23] + prev_p[24]) / 2
+        root_vel = (midhip_curr - midhip_prev) / dt
+        velocities = velocities - root_vel
 
-        r_arm_v = velocities[BodyLandmarkGroups.RIGHT_ARM]
-        l_arm_v = velocities[BodyLandmarkGroups.LEFT_ARM]
+        lm_list = [BodyLandmarkGroups.ALL,
+                   BodyLandmarkGroups.UPPER_BODY,
+                   BodyLandmarkGroups.LOWER_BODY,
+                   BodyLandmarkGroups.RIGHT_ARM,
+                   BodyLandmarkGroups.LEFT_ARM,
+                   BodyLandmarkGroups.RIGHT_LEG,
+                   BodyLandmarkGroups.LEFT_LEG]
 
-        r_leg_v = velocities[BodyLandmarkGroups.RIGHT_LEG]
-        l_leg_v = velocities[BodyLandmarkGroups.LEFT_LEG]
+        # KE for all groups
+        for name, idx_group in zip(self.group_names, lm_list):
+            v = velocities[idx_group]
+            if len(v) == 0: continue
 
-        variables = [whole_v, upper_v, lower_v, r_arm_v, l_arm_v, r_leg_v, l_leg_v]
+            group_mass = masses[f"{name}_m"]
+            point_mass = np.sum(group_mass) / len(v)
 
-        for name, velocity in zip(self.group_names, variables):
-            ke[f"{name}_ke"] = 0.5 * np.sum(masses[f"{name}_m"] * np.sum(velocity ** 2, axis=1))
+            ke[f"{name}_ke"] = 0.5 * point_mass * np.sum(np.sum(v ** 2, axis=1))
 
         return ke
 
-    def compare_kinetic_energy(self, ke, dominance_ratio=3):
+    def compare_kinetic_energy(self, ke, dominance_ratio=10):
         relevant_groups = {
             "right arm": ke["r_arm_ke"],
             "left arm": ke["l_arm_ke"],

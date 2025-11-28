@@ -20,9 +20,9 @@ frame_height = 1080
 
 # Paths and files
 base_path = ""
-video_path = "03_low_level_features/videos/"
+video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "micro-dance.avi"
+video_name = "mauri.mp4"
 live_input = False
 
 # Filtering
@@ -33,7 +33,6 @@ order = 2
 # Plotting
 plot_window_seconds = 5
 max_ke = 15.0
-
 
 # Creating a PoseLandmarker object
 base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
