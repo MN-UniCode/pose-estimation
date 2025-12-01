@@ -40,7 +40,9 @@ echo -e "${BLUE}Upgrade pip and requirements installation...${NC}"
 pip install --upgrade pip
 
 if [ -f "requirements.txt" ]; then
-    pip install -r requirements.txt
+    mkdir -p ~/tmp_build
+    TMPDIR=~/tmp_build pip install -r requirements.txt
+    rm -rf ~/tmp_build
 else
     echo -e "${RED}Attention: requirements.txt not found! Skip this step.${NC}"
 fi
@@ -59,7 +61,9 @@ else
 fi
 
 echo -e "${BLUE}Installing package SAM 2 (pip install -e .)...${NC}"
-pip install -e .
+mkdir -p ~/tmp_build
+TMPDIR=~/tmp_build pip install -e .
+rm -rf ~/tmp_build
 
 # 6. Download Checkpoints
 echo -e "${BLUE}Checkpoints download...${NC}"

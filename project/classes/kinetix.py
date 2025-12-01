@@ -68,6 +68,12 @@ class Kinetix:
 
         prev_time = curr_time
 
+        keymap = {
+            ord('l'): ['r_arm', 'r_leg', 'l_arm', 'l_leg'],
+            ord('w'): ['whole', 'upper', 'lower'],
+            ord('b'): self.group_names
+        }
+
         while True:
             # Getting current frame
             success, current_frame = cap.read()
@@ -120,24 +126,14 @@ class Kinetix:
 
             if key == ord('q'):
                 break
-            elif key == ord('l'):
-                group_plot = ['r_arm', 'r_leg', 'l_arm', 'l_leg']
-            elif key == ord('w'):
-                group_plot = ['whole', 'upper', 'lower']
-            elif key == ord('b'):
-                group_plot = self.group_names
+
+            if key in keymap:
+                group_plot = keymap[key]
 
         # Cleanup
         cap.release()
         cv2.destroyAllWindows()
 
-    # Computing the first-order derivative
-    # def first_order_derivative(self, curr_value, prev_value, curr_time, prev_time):
-    #     result = None
-    #     if curr_value is not None and prev_value is not None and curr_time is not None and prev_time is not None:
-    #         dt = curr_time - prev_time
-    #         result = (curr_value - prev_value) / dt
-    #     return result
 
     def compute_components_kinetic_energy(
             self, current_detection_result, previous_detection_result,
