@@ -13,15 +13,23 @@ from collections import deque
 from .drawer import Drawer
 
 class Kinetix:
-    def __init__(self, fps, plot_window_seconds, frame_width, frame_height, total_mass):
-        self.frame_width = frame_width
-        self.frame_height = frame_height
+    def __init__(self, fps, plot_window_seconds, total_mass):
+        self.frame_width = None
+        self.frame_height = None
         self.total_mass = total_mass
         self.fps = fps
 
         self.maxlen = int(fps) * plot_window_seconds
 
         self.group_names = ["whole", "upper", "lower", "r_arm", "l_arm", "r_leg", "l_leg"]
+
+        self.lm_list = [BodyLandmarkGroups.ALL,
+                   BodyLandmarkGroups.UPPER_BODY,
+                   BodyLandmarkGroups.LOWER_BODY,
+                   BodyLandmarkGroups.RIGHT_ARM,
+                   BodyLandmarkGroups.LEFT_ARM,
+                   BodyLandmarkGroups.RIGHT_LEG,
+                   BodyLandmarkGroups.LEFT_LEG]
 
         # Create dictionary
         self.ke_histories = {
@@ -169,16 +177,8 @@ class Kinetix:
         root_vel = (midhip_curr - midhip_prev) / dt
         velocities = velocities - root_vel
 
-        lm_list = [BodyLandmarkGroups.ALL,
-                   BodyLandmarkGroups.UPPER_BODY,
-                   BodyLandmarkGroups.LOWER_BODY,
-                   BodyLandmarkGroups.RIGHT_ARM,
-                   BodyLandmarkGroups.LEFT_ARM,
-                   BodyLandmarkGroups.RIGHT_LEG,
-                   BodyLandmarkGroups.LEFT_LEG]
-
         # KE for all groups
-        for name, idx_group in zip(self.group_names, lm_list):
+        for name, idx_group in zip(self.group_names, self.lm_list):
             v = velocities[idx_group]
             if len(v) == 0: continue
 

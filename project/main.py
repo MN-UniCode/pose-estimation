@@ -15,15 +15,15 @@ from classes.kinetix import Kinetix
 # Kinetic energy computation
 use_anthropometric_tables = True
 total_mass = 67
-frame_width = 1920
-frame_height = 1080
+# frame_width = 1920
+# frame_height = 1080
 
 # Paths and files
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
 video_name = "mauri.mp4"
-live_input = False
+live_input = True
 
 # Filtering
 cutoff = 6.0
@@ -57,7 +57,7 @@ fps = cap.get(cv2.CAP_PROP_FPS)
 # Creating filter
 butterworth_filter = ButterworthMultichannel(len(BodyLandmarks) * 3, order, cutoff, btype='lowpass', fs=fps)
 
-kinetix = Kinetix(fps, plot_window_seconds, frame_width, frame_height, total_mass)
+kinetix = Kinetix(fps, plot_window_seconds, total_mass)
 
 kinetix(detector, butterworth_filter, cap, max_ke, use_anthropometric_tables)
 
