@@ -6,7 +6,7 @@ from mediapipe.tasks.python import vision
 from classes.body_landmarks import BodyLandmarks
 
 # Filters
-from classes.filters import ButterworthMultichannel
+from classes.filters import ButterworthMultichannel, HampelMultichannel
 
 # Utilities and data structures
 from classes.kinetix import Kinetix
@@ -55,9 +55,14 @@ else:
 fps = cap.get(cv2.CAP_PROP_FPS)
 
 # Creating filter
-butterworth_filter = ButterworthMultichannel(len(BodyLandmarks) * 3, order, cutoff, btype='lowpass', fs=fps)
+num_channels = len(BodyLandmarks) * 3
+
+hampel_filter = HampelMultichannel(num_channels, window_size=11, n_sigma=2.5, replace_with='median')
+
+butterworth_filter = ButterworthMultichannel(num_channels, order, cutoff, btype='lowpass', fs=fps)
+
+filters = [butterworth_filter]
 
 kinetix = Kinetix(fps, plot_window_seconds, total_mass)
 
-kinetix(detector, butterworth_filter, cap, max_ke, use_anthropometric_tables)
-
+kinetix(detector, filters, cap, max_ke, use_anthropometric_tables)

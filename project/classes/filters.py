@@ -171,3 +171,78 @@ class Hampel:
                 return median
 
         return center_value
+
+class HampelMultichannel:
+    def __init__(self, num_channels, window_size=5, n_sigma=3, replace_with='median'):
+        """
+        Filtro di Hampel multicanale in tempo reale per dati di landmark (e.g., 99 canali).
+
+        Args:
+            num_channels (int): Numero di canali (e.g., 33 * 3 = 99).
+            window_size (int): Semi-dimensione della finestra (dimensione del buffer = 2k + 1).
+            n_sigma (float): Soglia in unità MAD per la rilevazione degli outlier.
+            replace_with (str): 'mean' o 'median' per la sostituzione degli outlier.
+        """
+        self.k = window_size
+        self.n_sigma = n_sigma
+        self.replace_with = replace_with
+        self.scale = 1.4826  # Scale factor for Gaussian noise
+        self.num_channels = num_channels
+        self.buffer_size = 2 * self.k + 1
+
+        # Initialize a buffer (deque) for each channel
+        self.buffers = [deque(maxlen=self.buffer_size) for _ in range(num_channels)]
+
+    def filter(self, values):
+        """
+        Elabora un nuovo array di campioni (un valore per canale) e restituisce il risultato filtrato.
+
+        Args:
+            values (np.array): Array 1D di valori in ingresso (dimensione: num_channels).
+
+        Returns:
+            np.array: Array 1D di valori filtrati (dimensione: num_channels).
+        """
+        if values.shape[0] != self.num_channels:
+            raise ValueError(f"Input array size must be {self.num_channels}, but got {values.shape[0]}.")
+
+        filtered_values = np.empty_like(values, dtype=float)
+
+        # Iterate on each channel (0 to 98)
+        for i in range(self.num_channels):
+            value = values[i]
+            current_buffer = self.buffers[i]
+            current_buffer.append(value)
+
+            if len(current_buffer) < self.buffer_size:
+                filtered_values[i] = value
+                continue
+
+            window = np.array(current_buffer)
+
+            center_value = window[self.k]
+
+            median = np.median(window)
+            mad = self.scale * np.median(np.abs(window - median))
+
+            threshold = 0.07
+
+            if mad == 0:
+                filtered_values[i] = np.clip(
+                    filtered_values[i],
+                    center_value - threshold,
+                    center_value + threshold
+                )
+            elif np.abs(center_value - median) > self.n_sigma * mad:
+                if self.replace_with == 'mean':
+                    filtered_values[i] = np.mean(window)
+                else:
+                    filtered_values[i] = median
+            else:
+                filtered_values[i] = np.clip(
+                    filtered_values[i],
+                    center_value - threshold,
+                    center_value + threshold
+                )
+
+        return filtered_values

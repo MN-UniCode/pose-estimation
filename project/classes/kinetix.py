@@ -37,7 +37,7 @@ class Kinetix:
             for name in self.group_names
         }
 
-    def __call__(self, detector, filter, cap, max_ke = 12.0, use_anthropometric_tables = False):
+    def __call__(self, detector, filters, cap, max_ke = 12.0, use_anthropometric_tables = False):
         # Checking for possible errors
         if not cap.isOpened():
             print("Error in opening the video stream.")
@@ -94,7 +94,7 @@ class Kinetix:
 
             # Computing kinetic energy
             ke = self.compute_components_kinetic_energy(detection_result, prev_detection,
-                                        dt_seconds, masses_dict, filter)
+                                        dt_seconds, masses_dict, filters)
 
             for name in group_plot:
                 self.ke_histories[f'{name}_ke'].append(ke[f'{name}_ke'])
@@ -138,7 +138,7 @@ class Kinetix:
     def compute_components_kinetic_energy(
             self, current_detection_result, previous_detection_result,
             dt, masses,
-            position_filter=None, max_speed=1):
+            position_filters=None, max_speed=1):
 
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
@@ -156,9 +156,10 @@ class Kinetix:
         prev_p = np.array([[lm.x, lm.y, lm.z] for lm in prev_lm])
 
         # Filter POSITIONS, not velocities
-        if position_filter is not None:
-            curr_p = position_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
-            prev_p = position_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
+        if position_filters is not None:
+            for pos_filter in position_filters:
+                curr_p = pos_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
+                prev_p = pos_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
 
         # Velocities
         velocities = (curr_p - prev_p) / dt
