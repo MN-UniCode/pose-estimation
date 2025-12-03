@@ -163,6 +163,9 @@ class Kinetix:
 
         # Velocities
         velocities = (curr_p - prev_p) / dt
+        visibility = np.array([lm.visibility for lm in curr_lm])
+        visible = visibility > 0.5
+        velocities[~visible] = 0
 
         # Outlier removal
         speed = np.linalg.norm(velocities, axis=1)
