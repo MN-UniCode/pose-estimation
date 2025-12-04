@@ -19,6 +19,8 @@ class Kinetix:
         self.total_mass = total_mass
         self.fps = fps
 
+        self.prev_p = None
+
         self.maxlen = int(fps) * plot_window_seconds
 
         self.group_names = ["whole", "upper", "lower", "r_arm", "l_arm", "r_leg", "l_leg"]
@@ -45,8 +47,7 @@ class Kinetix:
         
         drawer = Drawer()
 
-        prev_detection = None
-        prev_time = None
+        prev_time = 0
 
         group_plot = self.group_names
 
@@ -59,14 +60,14 @@ class Kinetix:
         masses_vector = masses.create_mass_vector(self.total_mass)
         masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables)
 
-        curr_time = time.time()
+        # curr_time = time.time()
 
-        if prev_time is None:
-            dt_seconds = 1.0 / self.fps
-        else:
-            dt_seconds = curr_time - prev_time
+        # if prev_time is None:
+        #     dt_seconds = 1.0 / self.fps
+        # else:
+        #     dt_seconds = curr_time - prev_time
 
-        prev_time = curr_time
+        # prev_time = curr_time
 
         keymap = {
             ord('l'): ['r_arm', 'r_leg', 'l_arm', 'l_leg'],
@@ -90,10 +91,14 @@ class Kinetix:
             detection_result = detector.detect_for_video(mp_image, int(timestamp_ms))
 
             # Getting current time and coordinates of the selected landmark
-            # curr_time = time.time()
+            curr_time = time.time()
+            dt_seconds = curr_time - prev_time
+            if dt_seconds <= 0 or dt_seconds > 1.0:
+                dt_seconds = 1.0 / max(1.0, self.fps)
+            prev_time = curr_time
 
             # Computing kinetic energy
-            ke = self.compute_components_kinetic_energy(detection_result, prev_detection,
+            ke = self.compute_components_kinetic_energy(detection_result,
                                         dt_seconds, masses_dict, filters)
 
             for name in group_plot:
@@ -102,10 +107,6 @@ class Kinetix:
             message = self.compare_kinetic_energy(ke)
             if message != "":
                 previous_message = message
-
-            # Updating
-            prev_detection = detection_result
-            # prev_time = curr_time
 
             # Plotting
             annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
@@ -136,33 +137,34 @@ class Kinetix:
 
 
     def compute_components_kinetic_energy(
-            self, current_detection_result, previous_detection_result,
+            self, current_detection_result,
             dt, masses,
             position_filters=None, max_speed=1):
 
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
         # Validate
-        if (current_detection_result is None or previous_detection_result is None or
-                not current_detection_result.pose_world_landmarks or
-                not previous_detection_result.pose_world_landmarks):
+        if current_detection_result is None or not current_detection_result.pose_world_landmarks:
             return ke
 
         curr_lm = current_detection_result.pose_world_landmarks[0]
-        prev_lm = previous_detection_result.pose_world_landmarks[0]
+        # prev_lm = previous_detection_result.pose_world_landmarks[0]
 
         # Positions - 33x3
         curr_p = np.array([[lm.x, lm.y, lm.z] for lm in curr_lm])
-        prev_p = np.array([[lm.x, lm.y, lm.z] for lm in prev_lm])
+        # prev_p = np.array([[lm.x, lm.y, lm.z] for lm in prev_lm])
 
         # Filter POSITIONS, not velocities
         if position_filters is not None:
             for pos_filter in position_filters:
                 curr_p = pos_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
-                prev_p = pos_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
+                # prev_p = pos_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
+
+        if self.prev_p is None:
+            self.prev_p = curr_p
 
         # Velocities
-        velocities = (curr_p - prev_p) / dt
+        velocities = (curr_p - self.prev_p) / dt
         visibility = np.array([lm.visibility for lm in curr_lm])
         visible = visibility > 0.5
         velocities[~visible] = 0
@@ -172,10 +174,10 @@ class Kinetix:
         velocities[speed > max_speed] = 0
 
         # Remove body global translation (use midhip)
-        midhip_curr = (curr_p[23] + curr_p[24]) / 2
-        midhip_prev = (prev_p[23] + prev_p[24]) / 2
-        root_vel = (midhip_curr - midhip_prev) / dt
-        velocities = velocities - root_vel
+        # midhip_curr = (curr_p[23] + curr_p[24]) / 2
+        # midhip_prev = (self.prev_p[23] + self.prev_p[24]) / 2
+        # root_vel = (midhip_curr - midhip_prev) / dt
+        # velocities = velocities - root_vel
 
         # KE for all groups
         for name, idx_group in zip(self.group_names, self.lm_list):
@@ -187,6 +189,10 @@ class Kinetix:
 
             ke[f"{name}_ke"] = 0.5 * np.sum(group_mass * np.sum(v ** 2, axis=1))
 
+        self.prev_p = curr_p
+
+        if ke["whole_ke"] > 1:
+            print(ke["whole_ke"])
         return ke
 
     def compare_kinetic_energy(self, ke, dominance_ratio=2):
