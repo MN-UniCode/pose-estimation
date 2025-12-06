@@ -12,8 +12,8 @@ from classes.body_landmarks import BodyLandmarks, YoloBodyLandmarks, YoloBodyLan
 from classes.filters import ButterworthMultichannel, HampelMultichannel
 
 # Utilities and data structures
-from classes.kinetix_mp import Kinetix_mp
-from classes.kinetix_yolo import Kinetix_Yolo
+from classes.kinetix.kinetix_mp import Kinetix_mp
+from classes.kinetix.kinetix_yolo import Kinetix_Yolo
 
 from ultralytics import YOLO
 
@@ -67,7 +67,7 @@ What motion tracking model do you want to use?:
 (q) Quit
 """
     )
-    
+
     if result == "1":
         # Creating a PoseLandmarker object
         base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')

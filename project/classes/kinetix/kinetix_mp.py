@@ -4,8 +4,8 @@ import mediapipe as mp
 import utility.masses as masses
 import time
 import sys
-from .drawer import Drawer
-from .Kinetix import Kinetix
+from ..drawer import Drawer
+from .base import Kinetix
 
 
 class Kinetix_mp(Kinetix):

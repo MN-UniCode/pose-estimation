@@ -3,8 +3,8 @@ import numpy as np
 import time
 import sys
 
-from .Kinetix import Kinetix
-from .drawer import Drawer
+from .base import Kinetix
+from ..drawer import Drawer
 import utility.masses as masses
 
 
