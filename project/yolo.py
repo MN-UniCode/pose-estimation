@@ -19,15 +19,14 @@ from ultralytics import YOLO
 # Kinetic energy computation
 use_anthropometric_tables = True
 total_mass = 67
-# frame_width = 1920
-# frame_height = 1080
+sub_height_m = 1.75
 
 # Paths and files
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "r_arm.MOV"
-live_input = False
+video_name = "mauri.mp4"
+live_input = True
 
 # Filtering
 cutoff = 3.0
@@ -47,7 +46,7 @@ os.environ["QT_QPA_PLATFORM"] = "xcb"
 #     output_segmentation_masks=True)
 # detector = vision.PoseLandmarker.create_from_options(options)
 
-yolo_pose = YOLO(model_path + "yolov8n-pose.pt")
+yolo_pose = YOLO(model_path + "yolo11x-pose.pt")
 
 # === Pre-processing === #
 
@@ -73,4 +72,4 @@ filters = [butterworth_filter]
 
 kinetix = Kinetix(fps, plot_window_seconds, total_mass)
 
-kinetix(yolo_pose, filters, cap, max_ke, use_anthropometric_tables)
+kinetix(yolo_pose, filters, cap, max_ke, sub_height_m, use_anthropometric_tables)

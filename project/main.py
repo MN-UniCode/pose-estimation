@@ -18,8 +18,6 @@ from classes.kinetix import Kinetix
 # Kinetic energy computation
 use_anthropometric_tables = True
 total_mass = 67
-# frame_width = 1920
-# frame_height = 1080
 
 # Paths and files
 base_path = ""

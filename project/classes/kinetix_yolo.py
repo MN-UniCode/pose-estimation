@@ -16,6 +16,9 @@ class Kinetix:
         self.total_mass = total_mass
         self.fps = fps
 
+        self.last_scale_factor = None
+        self.last_world_kpts = None
+
         self.prev_p = None
         self.maxlen = int(fps) * plot_window_seconds
 
@@ -36,7 +39,7 @@ class Kinetix:
             for name in self.group_names
         }
 
-    def __call__(self, model, filters, cap, max_ke, use_anthropometric_tables=False):
+    def __call__(self, model, filters, cap, max_ke, sub_height, use_anthropometric_tables=False):
         if not cap.isOpened():
             print("Error in opening the video stream.")
             sys.exit()
@@ -70,7 +73,7 @@ class Kinetix:
 
             # === Inferenza YOLO ===
             # Eseguiamo YOLO sul frame corrente
-            results = model(current_frame, verbose=False)
+            results = model.track(current_frame, verbose=False, persist=True, show=False)
 
             # Estraiamo i keypoints (shape: 1, 17, 3 -> x, y, conf)
             # Prendiamo il primo detection [0]
@@ -80,6 +83,8 @@ class Kinetix:
             else:
                 keypoints_data = None
 
+            world_kpts = self.yolo_to_world_approx(keypoints_data, subject_height_m=sub_height)
+
             # Gestione del tempo
             curr_time = time.time()
             dt_seconds = curr_time - prev_time
@@ -88,7 +93,7 @@ class Kinetix:
             prev_time = curr_time
 
             # === Calcolo KE ===
-            ke = self.compute_components_kinetic_energy(keypoints_data,
+            ke = self.compute_components_kinetic_energy(world_kpts,
                                                         dt_seconds, masses_dict, filters)
 
             for name in group_plot:
@@ -131,11 +136,9 @@ class Kinetix:
         cv2.destroyAllWindows()
 
     def compute_components_kinetic_energy(
-            self, keypoints,
+            self, keypoints,  # Ora riceve un array numpy (17, 3)
             dt, masses,
-            position_filters=None,
-            max_speed=5000,  # Nota: questo ora si riferisce ai pixel, ma filtreremo dopo
-            subject_height_m=1.75):  # <--- NUOVO PARAMETRO: Altezza reale in metri
+            position_filters=None, max_speed=5000):  # Aumentato max_speed perché siamo in pixel
 
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
@@ -143,96 +146,116 @@ class Kinetix:
         if keypoints is None:
             return ke
 
-        # === 1. Estrazione Coordinate ===
-        curr_xy = keypoints[:, :2]  # (17, 2) in Pixel
+        # === MODIFICA 4: Coordinate e Assi ===
+        # YOLO restituisce [x, y, conf]. MediaPipe dava x,y,z normalizzati o in metri.
+        # Qui usiamo i pixel. Z non c'è, quindi lo mettiamo a 0.
+
+        # Estraiamo x, y
+        curr_xy = keypoints[:, :2]
+        # Estraiamo confidenza
         curr_conf = keypoints[:, 2]
 
-        # Creiamo vettore (17, 3) con z=0
+        # Creiamo un vettore (17, 3) dove z=0 per compatibilità
         curr_p = np.zeros((17, 3))
         curr_p[:, :2] = curr_xy
 
-        # === 2. Calcolo Fattore di Scala (Pixel -> Metri) ===
-        # Usiamo la distanza verticale tra gli occhi (o naso) e le caviglie per stimare l'altezza
-        # YOLO indices: 0:Nose, 15:Left Ankle, 16:Right Ankle
-
-        # Prendiamo le y delle caviglie (se visibili, conf > 0.5)
-        ankles_y = []
-        if curr_conf[15] > 0.5: ankles_y.append(curr_p[15, 1])
-        if curr_conf[16] > 0.5: ankles_y.append(curr_p[16, 1])
-
-        # Prendiamo la y del naso o occhi
-        top_y = curr_p[0, 1] if curr_conf[0] > 0.5 else None
-
-        scale_factor = 0
-
-        # Se abbiamo punti sufficienti per stimare l'altezza
-        if top_y is not None and len(ankles_y) > 0:
-            mean_ankle_y = np.mean(ankles_y)
-            pixel_height = abs(mean_ankle_y - top_y)
-
-            # Evitiamo divisioni per zero o altezze assurde
-            if pixel_height > 10:
-                # Fattore correttivo: La distanza Naso-Caviglie è circa il 85-90% dell'altezza totale
-                # Quindi Pixel_Totali_Stimati = pixel_height / 0.88
-                estimated_total_pixel_height = pixel_height / 0.88
-
-                scale_factor = subject_height_m / estimated_total_pixel_height
-
-        # Fallback: Se non riusciamo a calcolare la scala (es. piedi non visibili),
-        # usiamo la scala del frame precedente se esiste, altrimenti 0 (no calcolo)
-        if scale_factor == 0 and hasattr(self, 'prev_scale') and self.prev_scale > 0:
-            scale_factor = self.prev_scale
-
-        self.prev_scale = scale_factor  # Salviamo per il prossimo frame
-
-        # === 3. Filtri Posizione (sui pixel raw) ===
+        # Filtro POSIZIONI
         if position_filters is not None:
             for pos_filter in position_filters:
                 curr_p = pos_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
 
         if self.prev_p is None:
             self.prev_p = curr_p
-            return ke  # Primo frame, niente velocità
 
-        # === 4. Calcolo Velocità in METRI AL SECONDO ===
-        # Differenza in pixel
-        diff_pixels = curr_p - self.prev_p
+        # Calcolo Velocità
+        velocities = (curr_p - self.prev_p) / dt
 
-        # Convertiamo la differenza in metri
-        if scale_factor > 0:
-            diff_meters = diff_pixels * scale_factor
-        else:
-            diff_meters = np.zeros_like(diff_pixels)  # Impossibile calcolare metri
-
-        velocities = diff_meters / dt  # m/s
-
-        # === 5. Filtri e Pulizia ===
-        # Filtro visibilità
+        # Filtro visibilità (usiamo la confidenza di YOLO)
         visible = curr_conf > 0.5
         velocities[~visible] = 0
 
-        # Outlier removal (Magnitude velocità in m/s)
-        # 5000 pixel/s erano tanti, ma 20 m/s è il record del mondo.
-        # Mettiamo un tetto umano, es. 15 m/s per movimenti esplosivi
-        max_speed_meters = 15.0
+        # Outlier removal (Magnitude velocità)
         speed = np.linalg.norm(velocities, axis=1)
-        velocities[speed > max_speed_meters] = 0
+        velocities[speed > max_speed] = 0
 
-        # === 6. Calcolo Energia Cinetica (Joule) ===
+        # KE for all groups
         for name, idx_group in zip(self.group_names, self.lm_list):
             v = velocities[idx_group]
             if len(v) == 0: continue
 
-            # Nota: masses[name] deve essere in kg
             group_mass = masses[f"{name}_m"]
+            # point_mass = np.sum(group_mass) / len(v)
 
-            # KE = 0.5 * m * v^2
-            # Qui assumiamo che group_mass sia scalare o array allineato
             ke[f"{name}_ke"] = 0.5 * np.sum(group_mass * np.sum(v ** 2, axis=1))
 
         self.prev_p = curr_p
 
         return ke
+
+    def yolo_to_world_approx(self, keypoints, subject_height_m=1.75):
+
+        if keypoints is None:
+            return self.last_world_kpts if self.last_world_kpts is not None else np.zeros((17, 3))
+
+        xy = keypoints[:, :2]
+        conf = keypoints[:, 2]
+
+        scale_factor = 0
+        conf_thresh = 0.5
+
+        # Occhi/Naso (Top)
+        top_y = None
+        if conf[0] > conf_thresh:
+            top_y = xy[0, 1]  # Naso
+        elif conf[1] > conf_thresh and conf[2] > conf_thresh:
+            top_y = (xy[1, 1] + xy[2, 1]) / 2  # Media Occhi
+
+        # Caviglie (Bottom Full)
+        ankles_y = []
+        if conf[15] > conf_thresh: ankles_y.append(xy[15, 1])
+        if conf[16] > conf_thresh: ankles_y.append(xy[16, 1])
+
+        # Spalle (Per larghezza o altezza)
+        shoulders_x = []
+        if conf[5] > conf_thresh: shoulders_x.append(xy[5, 0])
+        if conf[6] > conf_thresh: shoulders_x.append(xy[6, 0])
+
+        if top_y is not None and len(ankles_y) > 0:
+            pixel_h = abs(np.mean(ankles_y) - top_y)
+            pixel_tot = pixel_h / 0.88
+            if pixel_tot > 1:
+                scale_factor = subject_height_m / pixel_tot
+        elif len(shoulders_x) > 0:
+            width_pixels = abs(shoulders_x[0] - shoulders_x[1])
+
+            ratio_shoulders = 0.24
+
+            if width_pixels > 20:
+                estimated_total_pixels = width_pixels / ratio_shoulders
+                scale_factor = subject_height_m / estimated_total_pixels
+
+
+        # ---> fallback: usa comunque l'ultima scala valida
+        if scale_factor is None:
+            scale_factor = self.last_scale_factor
+
+        # ---> se ancora nulla restituisce uni per i pixel
+        if scale_factor is None:
+            return self.last_world_kpts if self.last_world_kpts is not None else np.ones((17, 3))
+
+        # Conversione in metri
+        xy_m = xy * scale_factor
+
+        world_kpts = np.zeros((17, 3))
+        world_kpts[:, 0] = xy_m[:, 0]
+        world_kpts[:, 1] = xy_m[:, 1]
+        world_kpts[:, 2] = conf
+
+        # salva per fallback
+        self.last_scale_factor = scale_factor
+        self.last_world_kpts = world_kpts
+
+        return world_kpts
 
     def compare_kinetic_energy(self, ke, dominance_ratio=2):
         relevant_groups = {
