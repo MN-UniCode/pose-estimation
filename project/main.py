@@ -6,7 +6,7 @@ import cv2
 # Mediapipe
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from classes.body_landmarks import BodyLandmarks
+from classes.body_landmarks import BodyLandmarks, YoloBodyLandmarks, YoloBodyLandmarkGroups, BodyLandmarkGroups
 
 # Filters
 from classes.filters import ButterworthMultichannel, HampelMultichannel
@@ -14,10 +14,13 @@ from classes.filters import ButterworthMultichannel, HampelMultichannel
 # Utilities and data structures
 from classes.kinetix import Kinetix
 
+from ultralytics import YOLO
+
 
 # Kinetic energy computation
 use_anthropometric_tables = True
 total_mass = 67
+sub_height_m = 1.75
 
 # Paths and files
 base_path = ""
@@ -36,13 +39,7 @@ max_ke = 12.0
 
 os.environ["QT_QPA_PLATFORM"] = "xcb"
 
-# Creating a PoseLandmarker object
-base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
-options = vision.PoseLandmarkerOptions(
-    base_options=base_options,
-    running_mode=vision.RunningMode.VIDEO,
-    output_segmentation_masks=True)
-detector = vision.PoseLandmarker.create_from_options(options)
+
 
 # === Pre-processing === #
 
@@ -56,16 +53,43 @@ else:
     print("Processing webcam input.")
 
 fps = cap.get(cv2.CAP_PROP_FPS)
-while True:
-    result = input(f"Is your video at {fps} fps (y/n)\n")
-    if result == "y":
-        break
-    else:
-        sys.exit()
 
+landmarks = None
+landmark_groups = None
+detector = None
+
+while True:
+    result = input(f"""
+                    What motion tracking model do you want to use?: \n
+                    (1) Mediapipe
+                    (2) YOLO
+                    (q) Quit
+                    """)
+    if result == "1":
+        # Creating a PoseLandmarker object
+        base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_heavy.task')
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.VIDEO,
+            output_segmentation_masks=True)
+        detector = vision.PoseLandmarker.create_from_options(options)
+
+        landmarks = BodyLandmarks
+        landmark_groups  = BodyLandmarkGroups
+        break
+    elif result == "2":
+        detector = YOLO(model_path + "yolo11x-pose.pt")
+
+        landmarks = YoloBodyLandmarks
+        landmark_groups  = YoloBodyLandmarkGroups
+        break
+    elif result == "q":
+        sys.exit()
+    else:
+        print("Please enter a valid option.")
 
 # Creating filter
-num_channels = len(BodyLandmarks) * 3
+num_channels = len(landmarks) * 3
 
 hampel_filter = HampelMultichannel(num_channels, window_size=11, n_sigma=2.5, replace_with='median')
 
@@ -73,6 +97,6 @@ butterworth_filter = ButterworthMultichannel(num_channels, order, cutoff, btype=
 
 filters = [butterworth_filter]
 
-kinetix = Kinetix(fps, plot_window_seconds, total_mass)
+kinetix = Kinetix(fps, plot_window_seconds, total_mass, sub_height_m, landmark_groups)
 
 kinetix(detector, filters, cap, max_ke, use_anthropometric_tables)

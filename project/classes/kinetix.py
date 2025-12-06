@@ -13,10 +13,13 @@ from collections import deque
 from .drawer import Drawer
 
 class Kinetix:
-    def __init__(self, fps, plot_window_seconds, total_mass):
+    def __init__(self, fps, plot_window_seconds, total_mass, sub_height, landmark_groups):
+        self.isYolo = True if "Yolo" in landmark_groups else False
+
         self.frame_width = None
         self.frame_height = None
         self.total_mass = total_mass
+        self.sub_height = sub_height
         self.fps = fps
 
         self.prev_p = None
@@ -25,13 +28,15 @@ class Kinetix:
 
         self.group_names = ["whole", "upper", "lower", "r_arm", "l_arm", "r_leg", "l_leg"]
 
-        self.lm_list = [BodyLandmarkGroups.ALL,
-                   BodyLandmarkGroups.UPPER_BODY,
-                   BodyLandmarkGroups.LOWER_BODY,
-                   BodyLandmarkGroups.RIGHT_ARM,
-                   BodyLandmarkGroups.LEFT_ARM,
-                   BodyLandmarkGroups.RIGHT_LEG,
-                   BodyLandmarkGroups.LEFT_LEG]
+        self.lm_list = [
+                        landmark_groups.ALL,
+                        landmark_groups.UPPER_BODY,
+                        landmark_groups.LOWER_BODY,
+                        landmark_groups.RIGHT_ARM,
+                        landmark_groups.LEFT_ARM,
+                        landmark_groups.RIGHT_LEG,
+                        landmark_groups.LEFT_LEG
+        ]
 
         # Create dictionary
         self.ke_histories = {
@@ -50,8 +55,8 @@ class Kinetix:
         group_plot = self.group_names
 
         # Compute the masses
-        masses_vector = masses.create_mass_vector(self.total_mass)
-        masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables)
+        masses_vector = masses.create_mass_vector(self.total_mass, yolo=self.isYolo)
+        masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables, yolo=self.isYolo)
 
         frame_index = 0
         prev_time = time.time()
