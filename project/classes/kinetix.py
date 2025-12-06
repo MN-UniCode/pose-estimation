@@ -110,7 +110,7 @@ class Kinetix:
 
             # Plotting
             annotated_image = drawer.draw_landmarks_on_image(current_frame, detection_result)
-            ke_graph_image = drawer.draw_cv_barchart(ke, group_plot, height=annotated_image.shape[0], max_value=max_ke)
+            ke_graph_image = drawer.draw_cv_barchart(ke, group_plot, img_shape=annotated_image.shape, max_value=max_ke)
 
             combined = drawer.stack_images_horizontal([annotated_image, ke_graph_image])
 

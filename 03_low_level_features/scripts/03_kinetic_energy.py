@@ -36,7 +36,7 @@ frame_height = 288
 base_path = ""
 video_path = "project/videos/"
 model_path = "02_motion_tracking/models/"
-video_name = "mauri.mp4"
+video_name = "r_arm.MOV"
 live_input = False
 
 # Filtering

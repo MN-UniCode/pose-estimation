@@ -34,7 +34,9 @@ class Drawer:
 
         return annotated_image
     
-    def draw_cv_barchart(self, ke, group_names, width=1240, height=480, max_value=200):
+    def draw_cv_barchart(self, ke, group_names, img_shape, max_value=200):
+        height = img_shape[0]
+        width = img_shape[1]*2
         graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # White canvas
 
         margin_left = 100

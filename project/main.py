@@ -22,7 +22,7 @@ total_mass = 67
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "mauri.mp4"
+video_name = "r_arm.MOV"
 live_input = False
 
 # Filtering
