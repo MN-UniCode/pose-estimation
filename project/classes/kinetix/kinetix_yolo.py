@@ -174,7 +174,7 @@ class Kinetix_Yolo(Kinetix):
                 scale_factor = subject_height_m / pixel_tot
 
         # Width-based fallback
-        elif len(shoulders_x) > 0:
+        elif len(shoulders_x) == 2:
             width_pixels = abs(shoulders_x[0] - shoulders_x[1])
             ratio_shoulders = 0.24
             if width_pixels > 20:
