@@ -33,24 +33,33 @@ class Drawer:
                     solutions.drawing_styles.get_default_pose_landmarks_style())
 
         return annotated_image
-    
-    def draw_cv_barchart(self, ke, group_names, img_shape, max_value=200):
-        height = img_shape[0]
-        width = img_shape[1]*2
+
+    def draw_cv_barchart(self, ke, group_names, target_height=600, max_value=12.0):
+        # Impostiamo l'altezza fissa desiderata per la visualizzazione
+        height = target_height
+        # La larghezza del grafico è proporzionata all'altezza (es. 16:9 o 4:3)
+        # Invece di dipendere dal video, la facciamo dipendere dall'altezza del grafico stesso
+        width = int(height * 1.5)
+
         graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # White canvas
 
-        margin_left = 100
-        margin_bottom = 60
-        margin_top = 20
+        # Calcolo dinamico delle dimensioni in base all'altezza (scalatura)
+        base_h = 600.0
+        scale = height / base_h
 
-        font_scale = 1.5
-        thickness = 2
+        margin_left = int(100 * scale)
+        margin_bottom = int(60 * scale)
+        margin_top = int(20 * scale)
 
-        bar_width = int((width - margin_left - 20) / len(group_names))
-        
+        font_scale = 0.8 * scale
+        thickness = max(1, int(2 * scale))
+
+        bar_width = int((width - margin_left - int(20 * scale)) / len(group_names))
+
         # Draw axes
-        cv2.line(graph, (margin_left, margin_top), (margin_left, height - margin_bottom), (0, 0, 0), 2)
-        cv2.line(graph, (margin_left, height - margin_bottom), (width - 10, height - margin_bottom), (0, 0, 0), 2)
+        cv2.line(graph, (margin_left, margin_top), (margin_left, height - margin_bottom), (0, 0, 0), thickness)
+        cv2.line(graph, (margin_left, height - margin_bottom), (width - 10, height - margin_bottom), (0, 0, 0),
+                 thickness)
 
         # Extract last KE values for each group
         values = []
@@ -60,28 +69,56 @@ class Drawer:
 
         # Plot bars
         for i, (name, value) in enumerate(zip(group_names, values)):
-            bar_height = int((min(value, max_value) / max_value) * (height - margin_bottom - margin_top))
-            x1 = margin_left + i * bar_width + 5
+            # Clamp value per evitare che la barra esca dal grafico
+            draw_val = min(value, max_value)
+
+            bar_height = int((draw_val / max_value) * (height - margin_bottom - margin_top))
+            x1 = margin_left + i * bar_width + int(5 * scale)
             y1 = height - margin_bottom - bar_height
-            x2 = x1 + bar_width - 10
+            x2 = x1 + bar_width - int(10 * scale)
             y2 = height - margin_bottom
 
             cv2.rectangle(graph, (x1, y1), (x2, y2), (0, 122, 255), -1)
 
             # Label group name
+            text_y_offset = int(40 * scale)
             cv2.putText(graph, name.replace("_", ""),
-                        (x1, height - margin_bottom + 47),
-                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,0), thickness)
+                        (x1, height - margin_bottom + text_y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness)
 
             # Label value
             cv2.putText(graph, f"{value:.1f}",
-                        (x1, y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0,0,0), thickness)
+                        (x1, y1 - int(5 * scale)),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), thickness)
 
         # Y-axis label
-        cv2.putText(graph, "K.E.", (5, margin_top + 20), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (50, 50, 50), thickness)
+        cv2.putText(graph, "K.E.", (int(5 * scale), margin_top + int(20 * scale)),
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (50, 50, 50), thickness)
 
         return graph
+
+    # Modifichiamo anche stack_images per gestire il resize automatico se le altezze non combaciano
+    def stack_images_horizontal(self, images):
+        if not images:
+            return None
+
+        # Troviamo l'altezza del primo'immagine (che useremo come riferimento)
+        h_target = images[0].shape[0]
+
+        resized_images = []
+        for img in images:
+            if len(img.shape) == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+
+            # Se l'altezza è diversa, ridimensioniamo mantenendo l'aspect ratio
+            if img.shape[0] != h_target:
+                scale = h_target / img.shape[0]
+                new_w = int(img.shape[1] * scale)
+                img = cv2.resize(img, (new_w, h_target))
+
+            resized_images.append(img)
+
+        return cv2.hconcat(resized_images)
 
     def create_text_banner(self, text, width=640, height=140, bg_color=(255, 255, 255), text_color=(0, 0, 0)):
         banner = np.ones((height, width, 3), dtype=np.uint8)
@@ -100,11 +137,11 @@ class Drawer:
         return banner
 
     # Stack OpenCV images horizontally
-    def stack_images_horizontal(self, images, scale=1.0):
-        resized_images = []
-        for img in images:
-            if len(img.shape) == 2:  # grayscale
-                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-            img = cv2.resize(img, None, fx=scale, fy=scale)
-            resized_images.append(img)
-        return cv2.hconcat(resized_images)
+    # def stack_images_horizontal(self, images, scale=1.0):
+    #     resized_images = []
+    #     for img in images:
+    #         if len(img.shape) == 2:  # grayscale
+    #             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    #         img = cv2.resize(img, None, fx=scale, fy=scale)
+    #         resized_images.append(img)
+    #     return cv2.hconcat(resized_images)
