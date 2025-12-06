@@ -1,3 +1,6 @@
+import os
+import sys
+
 import cv2
 
 # Mediapipe
@@ -26,12 +29,14 @@ video_name = "mauri.mp4"
 live_input = False
 
 # Filtering
-cutoff = 6.0
+cutoff = 3.0
 order = 2
 
 # Plotting
 plot_window_seconds = 5
-max_ke = 15.0
+max_ke = 12.0
+
+os.environ["QT_QPA_PLATFORM"] = "xcb"
 
 # Creating a PoseLandmarker object
 base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
@@ -53,6 +58,13 @@ else:
     print("Processing webcam input.")
 
 fps = cap.get(cv2.CAP_PROP_FPS)
+while True:
+    result = input(f"Is your video at {fps} fps (y/n)\n")
+    if result == "y":
+        break
+    else:
+        sys.exit()
+
 
 # Creating filter
 num_channels = len(BodyLandmarks) * 3

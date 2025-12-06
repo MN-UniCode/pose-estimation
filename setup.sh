@@ -48,22 +48,22 @@ else
 fi
 
 # 5. Installation SAM 2
-echo -e "${BLUE}Check SAM 2 installation...${NC}"
-
-if [ -d "sam2" ]; then
-    echo -e "${GREEN}✔ sam2 folder already present. Executing git pull to update...${NC}"
-    cd sam2
-    git pull
-else
-    echo -e "${BLUE}Cloning repository SAM 2...${NC}"
-    git clone https://github.com/facebookresearch/sam2.git
-    cd sam2
-fi
-
-echo -e "${BLUE}Installing package SAM 2 (pip install -e .)...${NC}"
-mkdir -p ~/tmp_build
-TMPDIR=~/tmp_build pip install -e .
-rm -rf ~/tmp_build
+#echo -e "${BLUE}Check SAM 2 installation...${NC}"
+#
+#if [ -d "sam2" ]; then
+#    echo -e "${GREEN}✔ sam2 folder already present. Executing git pull to update...${NC}"
+#    cd sam2
+#    git pull
+#else
+#    echo -e "${BLUE}Cloning repository SAM 2...${NC}"
+#    git clone https://github.com/facebookresearch/sam2.git
+#    cd sam2
+#fi
+#
+#echo -e "${BLUE}Installing package SAM 2 (pip install -e .)...${NC}"
+#mkdir -p ~/tmp_build
+#TMPDIR=~/tmp_build pip install -e .
+#rm -rf ~/tmp_build
 
 # 6. Download Checkpoints
 echo -e "${BLUE}Checkpoints download...${NC}"

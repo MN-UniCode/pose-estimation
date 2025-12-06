@@ -27,16 +27,16 @@ from collections import deque
 # === Constants  === #
 
 # Kinetic energy computation
-use_anthropometric_tables = False
-total_mass = 80
+use_anthropometric_tables = True
+total_mass = 67
 frame_width = 352
 frame_height = 288
 
 # Paths and files
 base_path = ""
-video_path = "02_motion_tracking/videos/"
+video_path = "project/videos/"
 model_path = "02_motion_tracking/models/"
-video_name = "micro-dance.avi"
+video_name = "r_arm.MOV"
 live_input = False
 
 # Filtering
@@ -69,39 +69,46 @@ def compute_kinetic_energy(current_detection_result, previous_detection_result,
     if detection_result is None or previous_detection_result is None:
         return None
     
-    if previous_detection_result.pose_landmarks is None or len(previous_detection_result.pose_landmarks) == 0:
+    if previous_detection_result.pose_world_landmarks is None or len(previous_detection_result.pose_world_landmarks) == 0:
         return None
     
-    if current_detection_result.pose_landmarks is None or len(current_detection_result.pose_landmarks) == 0:
+    if current_detection_result.pose_world_landmarks is None or len(current_detection_result.pose_world_landmarks) == 0:
         return None
 
     # Use only the first detected person
-    current_landmarks = current_detection_result.pose_landmarks[0]
-    previous_landmarks = previous_detection_result.pose_landmarks[0]
+    current_landmarks = current_detection_result.pose_world_landmarks[0]
+    previous_landmarks = previous_detection_result.pose_world_landmarks[0]
+
+    curr_p = np.array([[lm.x, lm.y, lm.z] for lm in current_landmarks])
+    prev_p = np.array([[lm.x, lm.y, lm.z] for lm in previous_landmarks])
+
+    # Filter POSITIONS, not velocities
+    if apply_filtering and velocity_filter is not None:
+        curr_p = velocity_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
+        prev_p = velocity_filter.filter(prev_p.reshape(-1)).reshape(prev_p.shape)
 
     n_landmarks = len(current_landmarks)
     if masses is None:
         masses = np.ones(n_landmarks)
 
     # Compute velocity vectors for each landmark
-    velocities = np.array([
-        first_order_derivative(np.array([curr_lm.x, curr_lm.y, curr_lm.z]),
-                               np.array([prev_lm.x, prev_lm.y, prev_lm.z]),
-                               curr_time, prev_time)
-        for curr_lm, prev_lm in zip(current_landmarks, previous_landmarks)
-    ])
+    dt = curr_time - prev_time
+    velocities = (curr_p - prev_p) / dt
 
     # Optional filtering
-    if apply_filtering and velocity_filter is not None:
-        # Flatten velocities for filtering: (n_points * 3,)
-        v_flat = velocities.reshape(-1)
-        # Filter one "sample" per channel (vectorized)
-        v_f = velocity_filter.filter(v_flat)
-        velocities = v_f.reshape(n_landmarks, 3)
+    # if apply_filtering and velocity_filter is not None:
+    #     # Flatten velocities for filtering: (n_points * 3,)
+    #     v_flat = velocities.reshape(-1)
+    #     # Filter one "sample" per channel (vectorized)
+    #     v_f = velocity_filter.filter(v_flat)
+    #     velocities = v_f.reshape(n_landmarks, 3)
 
     # Compute total kinetic energy
     speed_squared = np.sum(velocities**2, axis=1)
     total_ke = 0.5 * np.sum(masses * speed_squared)
+
+    if total_ke > 1:
+        print("Total ke = ", total_ke)
 
     return total_ke
      
@@ -112,12 +119,12 @@ def compute_kinetic_energy(current_detection_result, previous_detection_result,
 def draw_landmarks_on_image(rgb_image, detection_result):
     pose_landmarks_list = detection_result.pose_landmarks
     annotated_image = rgb_image.copy()
-    
+
     # Loop through the detected poses to visualize
     if len(pose_landmarks_list) > 0:
         for idx in range(len(pose_landmarks_list)):
             pose_landmarks = pose_landmarks_list[idx]
-            
+
             # Draw the pose landmarks
             pose_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
             pose_landmarks_proto.landmark.extend([
@@ -128,11 +135,11 @@ def draw_landmarks_on_image(rgb_image, detection_result):
                 pose_landmarks_proto,
                 solutions.pose.POSE_CONNECTIONS,
                 solutions.drawing_styles.get_default_pose_landmarks_style())
-            
+
     return annotated_image
 
 # Drawing a graph over time using OpenCV
-def draw_cv_graph(history, width=640, height=480, max_value = 2.0, fps = 25, window_length = 5, y_label="y"):
+def draw_cv_graph(history, width=1240, height=480, max_value = 2.0, fps = 25, window_length = 5, y_label="y"):
     graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # white background
 
     # Axes
@@ -218,6 +225,8 @@ while True:
     success, current_frame = cap.read()
     if not success:
         break
+
+    frame_height, frame_width, _ = current_frame.shape
     
     # Resizing it
     current_frame = cv2.resize(current_frame, (frame_width, frame_height))
@@ -248,7 +257,7 @@ while True:
         
     # Plotting
     annotated_image = draw_landmarks_on_image(current_frame, detection_result)
-    ke_graph_image = draw_cv_graph(ke_history, annotated_image.shape[1], annotated_image.shape[0], max_ke, fps, plot_window_seconds, "Kinetic Energy")
+    ke_graph_image = draw_cv_graph(ke_history, height=annotated_image.shape[0], max_value=max_ke, fps=fps, window_length=plot_window_seconds, y_label="Kinetic Energy")
     combined = stack_images_horizontal([annotated_image, ke_graph_image])
 
     # Showing the result
