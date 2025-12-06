@@ -3,40 +3,14 @@ import numpy as np
 import time
 import sys
 
-from .body_landmarks import YoloBodyLandmarkGroups
+from .Kinetix import Kinetix
 from .drawer import Drawer
 import utility.masses as masses
 
 
-class Kinetix_Yolo:
-    # Initialize main parameters and group definitions
-    def __init__(self, fps, plot_window_seconds, total_mass):
-        self.fps = fps
-        self.total_mass = total_mass
-
-        self.frame_width = None
-        self.frame_height = None
-
-        self.prev_p = None
-        self.maxlen = int(fps * plot_window_seconds)
-
-        # Body groups used for kinetic energy computation
-        self.group_names = [
-            "whole", "upper", "lower",
-            "r_arm", "l_arm", "r_leg", "l_leg"
-        ]
-
-        # Index lists for YOLO landmark groups
-        self.lm_list = [YoloBodyLandmarkGroups.ALL,
-                        YoloBodyLandmarkGroups.UPPER_BODY,
-                        YoloBodyLandmarkGroups.LOWER_BODY,
-                        YoloBodyLandmarkGroups.RIGHT_ARM,
-                        YoloBodyLandmarkGroups.LEFT_ARM,
-                        YoloBodyLandmarkGroups.RIGHT_LEG,
-                        YoloBodyLandmarkGroups.LEFT_LEG]
-
+class Kinetix_Yolo(Kinetix):
     # Main execution loop for YOLO-based tracking and KE computation
-    def __call__(self, model, filters, cap, max_ke, sub_height, use_anthropometric_tables=False):
+    def __call__(self, detector, filters, cap, max_ke, sub_height=None, use_anthropometric_tables=False):
         if not cap.isOpened():
             print("Error in opening the video stream.")
             sys.exit()
@@ -67,7 +41,7 @@ class Kinetix_Yolo:
             self.frame_height, self.frame_width, _ = current_frame.shape
 
             # YOLOv8 tracking step
-            results = model.track(current_frame, verbose=False, persist=True, show=False)
+            results = detector.track(current_frame, verbose=False, persist=True, show=False)
             if len(results[0].keypoints) > 0:
                 keypoints_data = results[0].keypoints.data[0].cpu().numpy()
             else:
@@ -83,10 +57,10 @@ class Kinetix_Yolo:
             prev_time = curr_time
 
             # Compute kinetic energy for each body group
-            ke = self.compute_components_kinetic_energy(world_kpts, dt, masses_dict, filters)
+            ke = self.compute_components_ke(world_kpts, dt, masses_dict, filters)
 
             # Compare KE to detect dominant movement
-            message = self.compare_kinetic_energy(ke)
+            message = self.compare_ke(ke)
             if message != "":
                 previous_message = message
 
@@ -114,15 +88,15 @@ class Kinetix_Yolo:
         cv2.destroyAllWindows()
 
     # Compute kinetic energy for all tracked body components
-    def compute_components_kinetic_energy(self, keypoints, dt, masses, filters=None, max_speed=1):
+    def compute_components_ke(self, detection, dt, masses_dict, filters=None, max_speed=1):
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
-        if keypoints is None:
+        if detection is None:
             return ke
 
         # Extract 2D pixel coordinates
-        curr_xy = keypoints[:, :2]
-        curr_conf = keypoints[:, 2]
+        curr_xy = detection[:, :2]
+        curr_conf = detection[:, 2]
 
         # Build 3D array with z = 0 for compatibility
         curr_p = np.zeros((17, 3))
@@ -153,7 +127,7 @@ class Kinetix_Yolo:
             if len(v) == 0:
                 continue
 
-            group_mass = masses[f"{name}_m"]
+            group_mass = masses_dict[f"{name}_m"]
             ke[f"{name}_ke"] = 0.5 * np.sum(group_mass * np.sum(v ** 2, axis=1))
 
         self.prev_p = curr_p
@@ -227,27 +201,3 @@ class Kinetix_Yolo:
         self.last_world_kpts = world_kpts
 
         return world_kpts
-
-    # Detect dominant movement based on KE ratios
-    def compare_kinetic_energy(self, ke, dominance_ratio=2):
-        relevant_groups = {
-            "right arm": ke["r_arm_ke"],
-            "left arm": ke["l_arm_ke"],
-            "right leg": ke["r_leg_ke"],
-            "left leg": ke["l_leg_ke"]
-        }
-
-        dominant_group = max(relevant_groups, key=relevant_groups.get)
-        dominant_value = relevant_groups[dominant_group]
-        if dominant_value < 0.1:
-            return ""
-
-        other_values = [v for k, v in relevant_groups.items() if k != dominant_group]
-
-        if all(v == 0 for v in other_values):
-            return ""
-
-        if all(dominant_value > dominance_ratio * v for v in other_values):
-            return f"The {dominant_group} is moving a lot."
-
-        return ""

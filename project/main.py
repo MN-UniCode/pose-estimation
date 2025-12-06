@@ -12,7 +12,7 @@ from classes.body_landmarks import BodyLandmarks, YoloBodyLandmarks, YoloBodyLan
 from classes.filters import ButterworthMultichannel, HampelMultichannel
 
 # Utilities and data structures
-from classes.kinetix import Kinetix
+from classes.kinetix_mp import Kinetix_mp
 from classes.kinetix_yolo import Kinetix_Yolo
 
 from ultralytics import YOLO
@@ -28,7 +28,7 @@ base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
 video_name = "mauri.mp4"
-live_input = False
+live_input = True
 
 # Filtering
 cutoff = 3.0
@@ -66,7 +66,8 @@ What motion tracking model do you want to use?:
 (2) YOLO
 (q) Quit
 """
-)
+    )
+    
     if result == "1":
         # Creating a PoseLandmarker object
         base_options = python.BaseOptions(model_asset_path=base_path + model_path + 'pose_landmarker_lite.task')
@@ -77,13 +78,15 @@ What motion tracking model do you want to use?:
         detector = vision.PoseLandmarker.create_from_options(options)
 
         landmarks = BodyLandmarks
-        kinetix = Kinetix(fps, plot_window_seconds, total_mass, sub_height_m)
+        landmark_groups  = BodyLandmarkGroups
+        kinetix = Kinetix_mp(fps, plot_window_seconds, total_mass, landmark_groups, sub_height_m)
         break
     elif result == "2":
         detector = YOLO(model_path + "yolo11n-pose.pt")
 
         landmarks = YoloBodyLandmarks
-        kinetix = Kinetix_Yolo(fps, plot_window_seconds, total_mass)
+        landmark_groups  = YoloBodyLandmarkGroups
+        kinetix = Kinetix_Yolo(fps, plot_window_seconds, total_mass, landmark_groups)
         break
     elif result == "q":
         sys.exit()

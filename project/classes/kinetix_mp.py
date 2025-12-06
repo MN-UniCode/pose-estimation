@@ -1,44 +1,15 @@
 import cv2
 import numpy as np
 import mediapipe as mp
-from .body_landmarks import BodyLandmarkGroups
 import utility.masses as masses
 import time
 import sys
 from .drawer import Drawer
+from .Kinetix import Kinetix
 
 
-class Kinetix:
-    def __init__(self, fps, plot_window_seconds, total_mass, sub_height):
-        # Initialize core parameters
-        self.fps = fps
-        self.total_mass = total_mass
-        self.sub_height = sub_height
-
-        self.frame_width = None
-        self.frame_height = None
-
-        self.prev_p = None
-        self.maxlen = int(fps * plot_window_seconds)
-
-        # Body groups used for KE computation
-        self.group_names = [
-            "whole", "upper", "lower",
-            "r_arm", "l_arm", "r_leg", "l_leg"
-        ]
-
-        # Corresponding landmark indices
-        self.lm_list = [
-            BodyLandmarkGroups.ALL,
-            BodyLandmarkGroups.UPPER_BODY,
-            BodyLandmarkGroups.LOWER_BODY,
-            BodyLandmarkGroups.RIGHT_ARM,
-            BodyLandmarkGroups.LEFT_ARM,
-            BodyLandmarkGroups.RIGHT_LEG,
-            BodyLandmarkGroups.LEFT_LEG,
-        ]
-
-    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False):
+class Kinetix_mp(Kinetix):
+    def __call__(self, detector, filters, cap, max_ke, sub_height=None, use_anthropometric_tables=False):
         # Ensure camera or video source is valid
         if not cap.isOpened():
             print("Error in opening the video stream.")
@@ -154,28 +125,3 @@ class Kinetix:
 
         self.prev_p = curr_p
         return ke
-
-    def compare_ke(self, ke, dominance_ratio=2):
-        # Compare KE between limbs to detect a dominant moving part
-        limbs = {
-            "right arm": ke["r_arm_ke"],
-            "left arm": ke["l_arm_ke"],
-            "right leg": ke["r_leg_ke"],
-            "left leg": ke["l_leg_ke"],
-        }
-
-        dominant = max(limbs, key=limbs.get)
-        dom_val = limbs[dominant]
-
-        if dom_val < 0.1:
-            return ""
-
-        others = [v for k, v in limbs.items() if k != dominant]
-
-        if all(v == 0 for v in others):
-            return ""
-
-        if all(dom_val > dominance_ratio * v for v in others):
-            return f"The {dominant} is moving a lot."
-
-        return ""
