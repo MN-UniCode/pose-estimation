@@ -10,7 +10,7 @@ import utility.masses as masses
 
 class Kinetix_Yolo(Kinetix):
     # Main execution loop for YOLO-based tracking and KE computation
-    def __call__(self, detector, filters, cap, max_ke, sub_height=None, use_anthropometric_tables=False):
+    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False, sub_height=None,):
         if not cap.isOpened():
             print("Error in opening the video stream.")
             sys.exit()

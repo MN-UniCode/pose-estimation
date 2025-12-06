@@ -64,43 +64,24 @@ def create_mass_dict(masses, group_names, use_table=False, yolo=False):
 
     masses_dict = {f"{name}_m": [] for name in group_names}
 
-    if yolo:
-        # Assign YOLO-specific groupings
+    groups = YoloBodyLandmarkGroups if yolo else BodyLandmarkGroups
+
+    # Dict
+    parts = {
+        'whole_m': 'ALL',
+        'upper_m': 'UPPER_BODY',
+        'lower_m': 'LOWER_BODY',
+        'r_arm_m': 'RIGHT_ARM',
+        'l_arm_m': 'LEFT_ARM',
+        'r_leg_m': 'RIGHT_LEG',
+        'l_leg_m': 'LEFT_LEG'
+    }
+
+    # Assign vale
+    for part_name, group_name in parts.items():
         if use_table:
-            masses_dict['whole_m'] = masses
-            masses_dict['upper_m'] = masses[YoloBodyLandmarkGroups.UPPER_BODY]
-            masses_dict['lower_m'] = masses[YoloBodyLandmarkGroups.LOWER_BODY]
-            masses_dict['r_arm_m'] = masses[YoloBodyLandmarkGroups.RIGHT_ARM]
-            masses_dict['l_arm_m'] = masses[YoloBodyLandmarkGroups.LEFT_ARM]
-            masses_dict['r_leg_m'] = masses[YoloBodyLandmarkGroups.RIGHT_LEG]
-            masses_dict['l_leg_m'] = masses[YoloBodyLandmarkGroups.LEFT_LEG]
+            masses_dict[part_name] = masses[getattr(groups, group_name)]
         else:
-            # Fallback: uniform mass
-            masses_dict['whole_m'] = np.ones(len(YoloBodyLandmarkGroups.ALL))
-            masses_dict['upper_m'] = np.ones(len(YoloBodyLandmarkGroups.UPPER_BODY))
-            masses_dict['lower_m'] = np.ones(len(YoloBodyLandmarkGroups.LOWER_BODY))
-            masses_dict['r_arm_m'] = np.ones(len(YoloBodyLandmarkGroups.RIGHT_ARM))
-            masses_dict['l_arm_m'] = np.ones(len(YoloBodyLandmarkGroups.LEFT_ARM))
-            masses_dict['r_leg_m'] = np.ones(len(YoloBodyLandmarkGroups.RIGHT_LEG))
-            masses_dict['l_leg_m'] = np.ones(len(YoloBodyLandmarkGroups.LEFT_LEG))
-    else:
-        # MediaPipe groups
-        if use_table:
-            masses_dict['whole_m'] = masses
-            masses_dict['upper_m'] = masses[BodyLandmarkGroups.UPPER_BODY]
-            masses_dict['lower_m'] = masses[BodyLandmarkGroups.LOWER_BODY]
-            masses_dict['r_arm_m'] = masses[BodyLandmarkGroups.RIGHT_ARM]
-            masses_dict['l_arm_m'] = masses[BodyLandmarkGroups.LEFT_ARM]
-            masses_dict['r_leg_m'] = masses[BodyLandmarkGroups.RIGHT_LEG]
-            masses_dict['l_leg_m'] = masses[BodyLandmarkGroups.LEFT_LEG]
-        else:
-            # Fallback: uniform mass
-            masses_dict['whole_m'] = np.ones(len(BodyLandmarkGroups.ALL))
-            masses_dict['upper_m'] = np.ones(len(BodyLandmarkGroups.UPPER_BODY))
-            masses_dict['lower_m'] = np.ones(len(BodyLandmarkGroups.LOWER_BODY))
-            masses_dict['r_arm_m'] = np.ones(len(BodyLandmarkGroups.RIGHT_ARM))
-            masses_dict['l_arm_m'] = np.ones(len(BodyLandmarkGroups.LEFT_ARM))
-            masses_dict['r_leg_m'] = np.ones(len(BodyLandmarkGroups.RIGHT_LEG))
-            masses_dict['l_leg_m'] = np.ones(len(BodyLandmarkGroups.LEFT_LEG))
+            masses_dict[part_name] = np.ones(len(getattr(groups, group_name)))
 
     return masses_dict

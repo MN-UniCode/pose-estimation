@@ -102,4 +102,4 @@ butterworth_filter = ButterworthMultichannel(num_channels, order, cutoff, btype=
 
 filters = [butterworth_filter]
 
-kinetix(detector, filters, cap, max_ke, use_anthropometric_tables)
+kinetix(detector, filters, cap, max_ke, use_anthropometric_tables, sub_height_m)

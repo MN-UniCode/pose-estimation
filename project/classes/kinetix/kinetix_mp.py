@@ -9,7 +9,7 @@ from .base import Kinetix
 
 
 class Kinetix_mp(Kinetix):
-    def __call__(self, detector, filters, cap, max_ke, sub_height=None, use_anthropometric_tables=False):
+    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False, sub_height=None,):
         # Ensure camera or video source is valid
         if not cap.isOpened():
             print("Error in opening the video stream.")
@@ -65,12 +65,12 @@ class Kinetix_mp(Kinetix):
                 previous_message = message
 
             plot(
-                ke = ke, 
-                max_ke = max_ke,
-                message = previous_message, 
-                group_plot = group_plot,
-                frame = frame,
-                detection = detection
+                ke=ke, 
+                max_ke=max_ke,
+                message=previous_message, 
+                group_plot=group_plot,
+                frame=frame,
+                detection=detection
             )
 
             key = cv2.waitKey(1) & 0xFF
