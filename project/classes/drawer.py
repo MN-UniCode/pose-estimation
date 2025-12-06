@@ -33,7 +33,42 @@ class Drawer:
                     solutions.drawing_styles.get_default_pose_landmarks_style())
 
         return annotated_image
-    
+
+    def draw_yolo_landmarks_on_image(self, image, landmarks_33):
+        """
+        landmarks_33 : np.array di shape (33,3)
+                       coordinate assolute in pixel (x,y,z ignorato)
+        """
+
+        annotated = image.copy()
+
+        if landmarks_33 is None:
+            return annotated
+
+        # --- Punto
+        for (x, y, z) in landmarks_33:
+            cv2.circle(annotated, (int(x), int(y)), 4, (0, 255, 0), -1)
+
+        # --- Connessioni del modello MediaPipe POSE
+        # La lista ufficiale (ridotta alle connessioni principali)
+        mp_connections = [
+            (11, 13), (13, 15),  # braccio sinistro
+            (12, 14), (14, 16),  # braccio destro
+            (23, 25), (25, 27),  # gamba sinistra
+            (24, 26), (26, 28),  # gamba destra
+            (11, 12),  # spalle
+            (23, 24),  # anche
+            (11, 23), (12, 24),  # torso
+            (0, 11), (0, 12)  # testa→spalle
+        ]
+
+        for a, b in mp_connections:
+            xa, ya, za = landmarks_33[a]
+            xb, yb, zb = landmarks_33[b]
+            cv2.line(annotated, (int(xa), int(ya)), (int(xb), int(yb)), (0, 255, 0), 2)
+
+        return annotated
+
     def draw_cv_barchart(self, ke, group_names, width=1240, height=480, max_value=200):
         graph = np.ones((height, width, 3), dtype=np.uint8) * 255  # White canvas
 
@@ -50,7 +85,6 @@ class Drawer:
         cv2.line(graph, (margin_left, margin_top), (margin_left, height - margin_bottom), (0, 0, 0), 2)
         cv2.line(graph, (margin_left, height - margin_bottom), (width - 10, height - margin_bottom), (0, 0, 0), 2)
 
-        # Extract last KE values for each group
         values = []
         for name in group_names:
             hist = ke[f"{name}_ke"]
