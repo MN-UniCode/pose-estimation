@@ -5,7 +5,7 @@ import cv2
 # Mediapipe
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from classes.body_landmarks import BodyLandmarks
+from classes.body_landmarks import YoloBodyLandmarks
 
 # Filters
 from classes.filters import ButterworthMultichannel, HampelMultichannel
@@ -26,7 +26,7 @@ total_mass = 67
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "mauri.mp4"
+video_name = "r_arm.MOV"
 live_input = False
 
 # Filtering
@@ -63,7 +63,7 @@ else:
 fps = cap.get(cv2.CAP_PROP_FPS)
 
 # Creating filter
-num_channels = len(BodyLandmarks) * 3
+num_channels = len(YoloBodyLandmarks) * 3
 
 hampel_filter = HampelMultichannel(num_channels, window_size=11, n_sigma=2.5, replace_with='median')
 

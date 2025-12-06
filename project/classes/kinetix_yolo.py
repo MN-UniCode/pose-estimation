@@ -3,6 +3,8 @@ import numpy as np
 import time
 import sys
 from collections import deque
+
+from .body_landmarks import YoloBodyLandmarkGroups
 from .drawer import Drawer
 import utility.masses as masses
 
@@ -20,19 +22,14 @@ class Kinetix:
         self.group_names = ["whole", "upper", "lower", "r_arm", "l_arm", "r_leg", "l_leg"]
 
         # === Indici YOLO (COCO Format 17 Keypoints) ===
-        # 0:Nose, 1:LEye, 2:REye, 3:LEar, 4:REar,
-        # 5:LShoulder, 6:RShoulder, 7:LElbow, 8:RElbow, 9:LWrist, 10:RWrist,
-        # 11:LHip, 12:RHip, 13:LKnee, 14:RKnee, 15:LAnkle, 16:RAnkle
 
-        self.lm_list = [
-            list(range(17)),  # whole (tutti)
-            [5, 6, 7, 8, 9, 10],  # upper (spalle + braccia)
-            [11, 12, 13, 14, 15, 16],  # lower (fianchi + gambe)
-            [6, 8, 10],  # r_arm (spalla, gomito, polso dx)
-            [5, 7, 9],  # l_arm (spalla, gomito, polso sx)
-            [12, 14, 16],  # r_leg (fianco, ginocchio, caviglia dx)
-            [11, 13, 15]  # l_leg (fianco, ginocchio, caviglia sx)
-        ]
+        self.lm_list = [YoloBodyLandmarkGroups.ALL,
+                        YoloBodyLandmarkGroups.UPPER_BODY,
+                        YoloBodyLandmarkGroups.LOWER_BODY,
+                        YoloBodyLandmarkGroups.RIGHT_ARM,
+                        YoloBodyLandmarkGroups.LEFT_ARM,
+                        YoloBodyLandmarkGroups.RIGHT_LEG,
+                        YoloBodyLandmarkGroups.LEFT_LEG]
 
         self.ke_histories = {
             f"{name}_ke": deque(maxlen=self.maxlen)
@@ -49,8 +46,8 @@ class Kinetix:
 
         # NOTA: Assicurati che utility.masses sia aggiornato per vettori di lunghezza 3 (braccia/gambe)
         # invece di 5 o 6 come in MediaPipe, altrimenti darà errore di shape.
-        masses_vector = masses.create_mass_vector(self.total_mass)
-        masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables)
+        masses_vector = masses.create_mass_vector(self.total_mass, yolo=True)
+        masses_dict = masses.create_mass_dict(masses_vector, self.group_names, use_anthropometric_tables, yolo=True)
 
         frame_index = 0
         prev_time = time.time()
@@ -61,6 +58,7 @@ class Kinetix:
             ord('w'): ['whole', 'upper', 'lower'],
             ord('b'): self.group_names
         }
+
         DISPLAY_HEIGHT = 600
 
         while True:
@@ -70,7 +68,7 @@ class Kinetix:
 
             self.frame_height, self.frame_width, _ = current_frame.shape
 
-            # === MODIFICA 2: Inferenza YOLO ===
+            # === Inferenza YOLO ===
             # Eseguiamo YOLO sul frame corrente
             results = model(current_frame, verbose=False)
 
@@ -89,7 +87,7 @@ class Kinetix:
                 dt_seconds = 1.0 / self.fps
             prev_time = curr_time
 
-            # === MODIFICA 3: Calcolo KE adattato ===
+            # === Calcolo KE ===
             ke = self.compute_components_kinetic_energy(keypoints_data,
                                                         dt_seconds, masses_dict, filters)
 
@@ -133,9 +131,11 @@ class Kinetix:
         cv2.destroyAllWindows()
 
     def compute_components_kinetic_energy(
-            self, keypoints,  # Ora riceve un array numpy (17, 3)
+            self, keypoints,
             dt, masses,
-            position_filters=None, max_speed=5000):  # Aumentato max_speed perché siamo in pixel
+            position_filters=None,
+            max_speed=5000,  # Nota: questo ora si riferisce ai pixel, ma filtreremo dopo
+            subject_height_m=1.75):  # <--- NUOVO PARAMETRO: Altezza reale in metri
 
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
@@ -143,73 +143,98 @@ class Kinetix:
         if keypoints is None:
             return ke
 
-        # === MODIFICA 4: Coordinate e Assi ===
-        # YOLO restituisce [x, y, conf]. MediaPipe dava x,y,z normalizzati o in metri.
-        # Qui usiamo i pixel. Z non c'è, quindi lo mettiamo a 0.
-
-        # Estraiamo x, y
-        curr_xy = keypoints[:, :2]
-        # Estraiamo confidenza
+        # === 1. Estrazione Coordinate ===
+        curr_xy = keypoints[:, :2]  # (17, 2) in Pixel
         curr_conf = keypoints[:, 2]
 
-        # Creiamo un vettore (17, 3) dove z=0 per compatibilità
+        # Creiamo vettore (17, 3) con z=0
         curr_p = np.zeros((17, 3))
         curr_p[:, :2] = curr_xy
 
-        # Filtro POSIZIONI
+        # === 2. Calcolo Fattore di Scala (Pixel -> Metri) ===
+        # Usiamo la distanza verticale tra gli occhi (o naso) e le caviglie per stimare l'altezza
+        # YOLO indices: 0:Nose, 15:Left Ankle, 16:Right Ankle
+
+        # Prendiamo le y delle caviglie (se visibili, conf > 0.5)
+        ankles_y = []
+        if curr_conf[15] > 0.5: ankles_y.append(curr_p[15, 1])
+        if curr_conf[16] > 0.5: ankles_y.append(curr_p[16, 1])
+
+        # Prendiamo la y del naso o occhi
+        top_y = curr_p[0, 1] if curr_conf[0] > 0.5 else None
+
+        scale_factor = 0
+
+        # Se abbiamo punti sufficienti per stimare l'altezza
+        if top_y is not None and len(ankles_y) > 0:
+            mean_ankle_y = np.mean(ankles_y)
+            pixel_height = abs(mean_ankle_y - top_y)
+
+            # Evitiamo divisioni per zero o altezze assurde
+            if pixel_height > 10:
+                # Fattore correttivo: La distanza Naso-Caviglie è circa il 85-90% dell'altezza totale
+                # Quindi Pixel_Totali_Stimati = pixel_height / 0.88
+                estimated_total_pixel_height = pixel_height / 0.88
+
+                scale_factor = subject_height_m / estimated_total_pixel_height
+
+        # Fallback: Se non riusciamo a calcolare la scala (es. piedi non visibili),
+        # usiamo la scala del frame precedente se esiste, altrimenti 0 (no calcolo)
+        if scale_factor == 0 and hasattr(self, 'prev_scale') and self.prev_scale > 0:
+            scale_factor = self.prev_scale
+
+        self.prev_scale = scale_factor  # Salviamo per il prossimo frame
+
+        # === 3. Filtri Posizione (sui pixel raw) ===
         if position_filters is not None:
             for pos_filter in position_filters:
-                # Attenzione: i filtri potrebbero aspettarsi 33 canali (vecchio MP).
-                # Devi assicurarti che ButterworthMultichannel sia inizializzato con
-                # num_channels = 17 * 3 (o modificare qui per passare solo i dati validi)
-                try:
-                    curr_p = pos_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
-                except Exception as e:
-                    pass  # Se le dimensioni del filtro non coincidono, saltiamo per ora
+                curr_p = pos_filter.filter(curr_p.reshape(-1)).reshape(curr_p.shape)
 
         if self.prev_p is None:
             self.prev_p = curr_p
+            return ke  # Primo frame, niente velocità
 
-        # Calcolo Velocità
-        velocities = (curr_p - self.prev_p) / dt
+        # === 4. Calcolo Velocità in METRI AL SECONDO ===
+        # Differenza in pixel
+        diff_pixels = curr_p - self.prev_p
 
-        # Filtro visibilità (usiamo la confidenza di YOLO)
+        # Convertiamo la differenza in metri
+        if scale_factor > 0:
+            diff_meters = diff_pixels * scale_factor
+        else:
+            diff_meters = np.zeros_like(diff_pixels)  # Impossibile calcolare metri
+
+        velocities = diff_meters / dt  # m/s
+
+        # === 5. Filtri e Pulizia ===
+        # Filtro visibilità
         visible = curr_conf > 0.5
         velocities[~visible] = 0
 
-        # Outlier removal (Magnitude velocità)
+        # Outlier removal (Magnitude velocità in m/s)
+        # 5000 pixel/s erano tanti, ma 20 m/s è il record del mondo.
+        # Mettiamo un tetto umano, es. 15 m/s per movimenti esplosivi
+        max_speed_meters = 15.0
         speed = np.linalg.norm(velocities, axis=1)
-        velocities[speed > max_speed] = 0
+        velocities[speed > max_speed_meters] = 0
 
-        # KE for all groups
+        # === 6. Calcolo Energia Cinetica (Joule) ===
         for name, idx_group in zip(self.group_names, self.lm_list):
             v = velocities[idx_group]
             if len(v) == 0: continue
 
-            # === ATTENZIONE ===
-            # masses[name] deve avere la stessa lunghezza di 'v'.
-            # MP aveva più punti per braccio (es. mignolo, indice, pollice).
-            # YOLO ha solo 3 punti per braccio.
-            # Se 'masses' è hardcoded per MP, questo crasherà.
-            # Soluzione temporanea: prendiamo la media della massa se le lunghezze differiscono
-            # oppure assumiamo che tu abbia aggiornato masses.py
+            # Nota: masses[name] deve essere in kg
+            group_mass = masses[f"{name}_m"]
 
-            group_mass_vector = masses[f"{name}_m"]
-
-            # Fallback di sicurezza per vettori massa
-            if len(group_mass_vector) != len(v):
-                # Se le dimensioni non coincidono, spalmiamo la massa totale del gruppo sui punti disponibili
-                total_m = np.sum(group_mass_vector)
-                group_mass_vector = np.full(len(v), total_m / len(v))
-
-            ke[f"{name}_ke"] = 0.5 * np.sum(group_mass_vector * np.sum(v ** 2, axis=1))
+            # KE = 0.5 * m * v^2
+            # Qui assumiamo che group_mass sia scalare o array allineato
+            ke[f"{name}_ke"] = 0.5 * np.sum(group_mass * np.sum(v ** 2, axis=1))
 
         self.prev_p = curr_p
 
         return ke
 
     def compare_kinetic_energy(self, ke, dominance_ratio=2):
-        # Invariato
         relevant_groups = {
             "right arm": ke["r_arm_ke"],
             "left arm": ke["l_arm_ke"],
