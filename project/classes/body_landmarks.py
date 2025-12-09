@@ -49,8 +49,8 @@ class BodyLandmarkGroups:
     UPPER_BODY = [11, 12, 13, 14, 15, 16, 23, 24]  # Shoulders, elbows, wrists, hips
     LOWER_BODY = [23, 24, 25, 26, 27, 28]          # Hips, knees, ankles
 
-    RIGHT_ARM = [12, 14, 16, 18, 20, 22]           # Right arm (shoulder → hand)
-    LEFT_ARM = [11, 13, 15, 17, 19, 21]            # Left arm
+    RIGHT_ARM = [12, 14, 16]                       # Right arm (shoulder → hand)
+    LEFT_ARM = [11, 13, 15]                        # Left arm
 
     RIGHT_LEG = [24, 26, 28]                       # Right leg (hip → ankle)
     LEFT_LEG = [23, 25, 27]                        # Left leg

@@ -9,7 +9,7 @@ from mediapipe.tasks.python import vision
 from classes.body_landmarks import BodyLandmarks, YoloBodyLandmarks, YoloBodyLandmarkGroups, BodyLandmarkGroups
 
 # Filters
-from classes.filters import ButterworthMultichannel, HampelMultichannel
+from classes.filters import ButterworthMultichannel, HampelMultichannel, SavitzkyGolayMultichannel
 
 # Utilities and data structures
 from classes.kinetix.kinetix_mp import Kinetix_mp
@@ -27,8 +27,8 @@ sub_height_m = 1.75
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "micro-dance.avi"
-live_input = True
+video_name = "nico.MOV"
+live_input = False
 
 # Filtering
 cutoff = 3.0
@@ -54,6 +54,7 @@ else:
     print("Processing webcam input.")
 
 fps = cap.get(cv2.CAP_PROP_FPS)
+delta_t = 1.0 / fps
 
 landmarks = None
 landmark_groups = None
@@ -99,6 +100,8 @@ num_channels = len(landmarks) * 3
 hampel_filter = HampelMultichannel(num_channels, window_size=11, n_sigma=2.5, replace_with='median')
 
 butterworth_filter = ButterworthMultichannel(num_channels, order, cutoff, btype='lowpass', fs=fps)
+
+savgol_vel_filter = SavitzkyGolayMultichannel(num_channels, window_length=9, polyorder=2, deriv=1, delta=delta_t)
 
 filters = [butterworth_filter]
 

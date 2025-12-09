@@ -59,35 +59,6 @@ class Drawer:
 
         return annotated_image
 
-    def _draw_yolo_landmarks_on_image(self, image, landmarks_33):
-        # Draw YOLO-generated pose landmarks + basic MediaPipe-style connections
-        annotated = image.copy()
-
-        if landmarks_33 is None:
-            return annotated
-
-        for (x, y, z) in landmarks_33:
-            cv2.circle(annotated, (int(x), int(y)), 4, (0, 255, 0), -1)
-
-        # Connections approximating MediaPipe POSE edges
-        mp_connections = [
-            (11, 13), (13, 15),  # left arm
-            (12, 14), (14, 16),  # right arm
-            (23, 25), (25, 27),  # left leg
-            (24, 26), (26, 28),  # right leg
-            (11, 12),            # shoulders
-            (23, 24),            # hips
-            (11, 23), (12, 24),  # torso
-            (0, 11), (0, 12)     # head to shoulders
-        ]
-
-        for a, b in mp_connections:
-            xa, ya, _ = landmarks_33[a]
-            xb, yb, _ = landmarks_33[b]
-            cv2.line(annotated, (int(xa), int(ya)), (int(xb), int(yb)), (0, 255, 0), 2)
-
-        return annotated
-
     def _draw_cv_barchart(self, ke, group_names, target_height=600, max_value=12.0):
         # Create bar chart canvas resized based on desired height
         height = target_height
