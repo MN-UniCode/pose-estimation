@@ -60,5 +60,5 @@ class Kinetix(ABC):
         pass
     
     @abstractmethod
-    def compute_components_ke(self, detection, dt, masses_dict, filters=None, max_speed=1):
+    def compute_components_ke(self, detection, dt, masses_dict, filters=None, track_id=None, max_speed=1):
         pass

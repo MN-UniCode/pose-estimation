@@ -27,7 +27,7 @@ sub_height_m = 1.75
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "nico.MOV"
+video_name = "multi-person.mp4"
 live_input = False
 
 # Filtering

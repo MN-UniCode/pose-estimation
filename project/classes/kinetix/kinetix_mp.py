@@ -83,7 +83,7 @@ class Kinetix_mp(Kinetix):
         cap.release()
         cv2.destroyAllWindows()
 
-    def compute_components_ke(self, detection, dt, masses_dict, filters=None, max_speed=1):
+    def compute_components_ke(self, detection, dt, masses_dict, filters=None, track_id=None, max_speed=1):
         # Initialize KE dictionary
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
