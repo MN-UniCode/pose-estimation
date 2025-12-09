@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
 
 class Kinetix(ABC):
-    def __init__(self, fps, plot_window_seconds, total_mass, landmark_groups, sub_height = None):
+    def __init__(self, fps, plot_window_seconds, total_mass, landmark_groups):
         # Initialize core parameters
         self.fps = fps
         self.total_mass = total_mass
-        self.sub_height = sub_height
 
         self.frame_width = None
         self.frame_height = None
@@ -56,7 +55,7 @@ class Kinetix(ABC):
         return ""
     
     @abstractmethod
-    def __call__(self, detector, filters, cap, max_ke, sub_height=None, use_anthropometric_tables=False):
+    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False):
         pass
     
     @abstractmethod

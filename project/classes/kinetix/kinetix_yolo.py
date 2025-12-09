@@ -9,14 +9,16 @@ import utility.masses as masses
 
 
 class Kinetix_Yolo(Kinetix):
+    
     def __init__(self, fps, plot_window_seconds, total_mass, landmark_groups, sub_height_m=1.75):
-        super().__init__(fps, plot_window_seconds, total_mass, landmark_groups, sub_height_m)
-        # Dizionari per gestire lo stato di ogni singola persona (Key: track_id)
+        super().__init__(fps, plot_window_seconds, total_mass, landmark_groups)
+        self.sub_height = sub_height_m
         self.prev_p_dict = {}
         self.scale_factors_dict = {}
         self.last_world_kpts_dict = {}
+
     # Main execution loop for YOLO-based tracking and KE computation
-    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False, sub_height=None,):
+    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False):
         if not cap.isOpened():
             print("Error in opening the video stream.")
             sys.exit()
@@ -30,7 +32,7 @@ class Kinetix_Yolo(Kinetix):
 
         frame_index = 0
         prev_time = time.time()
-        previous_message = ""
+        previous_message = {}
 
         # Group selection shortcuts
         keymap = {
@@ -46,7 +48,7 @@ class Kinetix_Yolo(Kinetix):
 
             self.frame_height, self.frame_width, _ = current_frame.shape
 
-            # YOLOv8 tracking step
+            # YOLO tracking step
             results = detector.track(current_frame, verbose=False, persist=True, show=False)
             frame_ke_data = {}
 
@@ -57,56 +59,46 @@ class Kinetix_Yolo(Kinetix):
             prev_time = curr_time
 
             if results[0].boxes.id is not None:
-                # Ottieni ID e Keypoints
+                # Retrieve IDs and keypoints
                 track_ids = results[0].boxes.id.int().cpu().tolist()
                 keypoints_all = results[0].keypoints.data.cpu().numpy()  # Shape (N, 17, 3)
 
-                # Identifica quali ID sono presenti nel frame corrente
+                # Identify which IDs are present in the current frame
                 current_ids_set = set(track_ids)
 
-                # Iteriamo su ogni persona rilevata
+                # Iterate over each detected person
                 for i, track_id in enumerate(track_ids):
-                    kpts_person = keypoints_all[i]  # Keypoints della singola persona
+                    kpts_person = keypoints_all[i]  # Single person keypoints
 
-                    # 1. Converti in coordinate mondo (specifico per ID)
-                    world_kpts = self.yolo_to_world_approx_id(kpts_person, track_id, subject_height_m=sub_height)
+                    # 1. Convert to approximate world coordinates (specific per ID)
+                    world_kpts = self.yolo_to_world_approx_id(kpts_person, track_id, subject_height_m=self.sub_height)
 
-                    # 2. Calcola energia cinetica (specifico per ID)
+                    # 2. Compute kinetic energy (specific per ID)
                     ke_person = self.compute_components_ke(world_kpts, dt, masses_dict, filters, track_id)
 
                     frame_ke_data[track_id] = ke_person
 
-                # Pulizia: Rimuovi dallo stato (prev_p) le persone che non sono più nel frame
-                # Questo evita che se una persona esce e rientra dopo 10 secondi, venga calcolata una velocità assurda
+                # Cleanup: remove people and their message no longer in frame
+                # This avoids unrealistic speed calculations if a person leaves and re-enters
                 ids_to_remove = [k for k in self.prev_p_dict if k not in current_ids_set]
                 for k in ids_to_remove:
                     del self.prev_p_dict[k]
-                    # Nota: non cancelliamo scale_factor e last_world_kpts per mantenere la memoria della "taglia" se rientra subito
+                
+                ids_to_remove_msgs = [pid for pid in previous_message.keys() if pid not in current_ids_set]
+                for pid in ids_to_remove_msgs:
+                    del previous_message[pid]
             else:
-                # Nessuna persona rilevata, puliamo lo stato di velocità
+                # No person detected, reset velocity state
                 self.prev_p_dict = {}
 
-            dominant_id = None
-            max_total_ke = -1
-            message = ""
+            messages = {}
 
             if frame_ke_data:
-                # Trova chi ha la somma totale di KE più alta
-                for t_id, ke_vals in frame_ke_data.items():
-                    total_ke = sum(ke_vals.values())
-                    if total_ke > max_total_ke:
-                        max_total_ke = total_ke
-                        dominant_id = t_id
-
-                # Genera il messaggio basandosi solo sulla persona dominante
-                if dominant_id is not None:
-                    # Assumiamo che compare_ke sia metodo della classe base che restituisce stringa
-                    message = self.compare_ke(frame_ke_data[dominant_id])
+                for person_id, value in frame_ke_data.items():
+                    message = self.compare_ke(value)
+                    messages[person_id] = message
                     if message != "":
-                        previous_message = message
-
-            # Se non c'è nessuno, usa il messaggio precedente
-            final_message = message if message != "" else previous_message
+                        previous_message[person_id] = message
 
             # Retrieve YOLO-annotated frame
             annotated_image = results[0].plot()
@@ -117,7 +109,7 @@ class Kinetix_Yolo(Kinetix):
                 message=previous_message,
                 group_plot=group_plot,
                 annotated_image=annotated_image,
-                dominant_id=dominant_id
+                model="yolo"
             )
 
             # Keyboard input handling
@@ -180,13 +172,11 @@ class Kinetix_Yolo(Kinetix):
 
     # Convert YOLO keypoints into approximate world coordinates using body height
     def yolo_to_world_approx_id(self, keypoints, track_id, subject_height_m=1.75):
-        # if keypoints is None:
-        #     return self.last_world_kpts if hasattr(self, 'last_world_kpts') else np.zeros((17, 3))
 
         xy = keypoints[:, :2]
         conf = keypoints[:, 2]
 
-        # Recupera fattori di scala salvati per questo ID
+        # Retrieve scale factors saved for this ID
         last_scale = self.scale_factors_dict.get(track_id, 0)
         last_world = self.last_world_kpts_dict.get(track_id, np.zeros((17, 3)))
 
@@ -244,7 +234,7 @@ class Kinetix_Yolo(Kinetix):
         world_kpts[:, 1] = xy_m[:, 1]
         world_kpts[:, 2] = conf
 
-        # Salva stato
+        # Save state
         self.scale_factors_dict[track_id] = scale_factor
         self.last_world_kpts_dict[track_id] = world_kpts
 

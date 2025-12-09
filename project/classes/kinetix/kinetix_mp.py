@@ -9,7 +9,12 @@ from .base import Kinetix
 
 
 class Kinetix_mp(Kinetix):
-    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False, sub_height=None,):
+
+    def __init__(self, fps, plot_window_seconds, total_mass, landmark_groups):
+        super().__init__(fps, plot_window_seconds, total_mass, landmark_groups)
+        self.person_id = 1
+
+    def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False):
         # Ensure camera or video source is valid
         if not cap.isOpened():
             print("Error in opening the video stream.")
@@ -24,7 +29,8 @@ class Kinetix_mp(Kinetix):
         frame_index = 0
         prev_time = time.time()
         ms_unit = 1000.0
-        previous_message = ""
+        # Message must be a dict ID -> Message
+        previous_message = {self.person_id : ""}
 
         # Keyboard shortcuts for plot filtering
         keymap = {
@@ -62,7 +68,7 @@ class Kinetix_mp(Kinetix):
             # Detect dominant movement
             message = self.compare_ke(ke)
             if message:
-                previous_message = message
+                previous_message[self.person_id] = message
 
             plot(
                 ke=ke, 
@@ -70,7 +76,8 @@ class Kinetix_mp(Kinetix):
                 message=previous_message, 
                 group_plot=group_plot,
                 frame=frame,
-                detection=detection
+                detection=detection,
+                model="mediapipe"
             )
 
             key = cv2.waitKey(1) & 0xFF
