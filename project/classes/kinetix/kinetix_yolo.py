@@ -114,10 +114,9 @@ class Kinetix_Yolo(Kinetix):
 
             # Keyboard input handling
             key = cv2.waitKey(1) & 0xFF
-            if key == ord("q"):
-                break
-            if key in keymap:
-                group_plot = keymap[key]
+            
+            if key == ord("q"): break
+            if key in keymap: group_plot = keymap[key]
 
             frame_index += 1
 
