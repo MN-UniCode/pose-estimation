@@ -29,6 +29,13 @@ class Kinetix(ABC):
             landmark_groups.LEFT_LEG,
         ]
 
+        # Keyboard shortcuts for plot filtering
+        self.keymap = {
+            ord("l"): ["r_arm", "r_leg", "l_arm", "l_leg"],
+            ord("w"): ["whole", "upper", "lower"],
+            ord("a"): self.group_names,
+        }
+
     def compare_ke(self, ke, dominance_ratio=2):
         # Compare KE between limbs to detect a dominant moving part
         limbs = {

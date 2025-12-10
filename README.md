@@ -88,6 +88,14 @@ When prompted, select the pose estimation backend:
 * Press **1** for **Mediapipe** (single-person tracking)
 * Press **2** for **YOLO** (multi-person tracking)
 
+#### 3.1 Real-Time Histogram Filtering
+
+During real-time visualization, you can filter the histogram using keyboard shortcuts:
+* Press `a` → ALL: shows all 7 categories 
+* Press `l` → LIMB: shows only limb categories (left/right arms and legs)
+* Press `w` → WHOLE: shows body-level groups (whole, upper, lower)
+* Press `q` → QUIT: stop the execution
+
 ---
 
 ## Output

@@ -32,13 +32,6 @@ class Kinetix_mp(Kinetix):
         # Message must be a dict ID -> Message
         previous_message = {self.person_id : ""}
 
-        # Keyboard shortcuts for plot filtering
-        keymap = {
-            ord("l"): ["r_arm", "r_leg", "l_arm", "l_leg"],
-            ord("w"): ["whole", "upper", "lower"],
-            ord("b"): self.group_names,
-        }
-
         plot = Drawer()
         group_plot = self.group_names
 
@@ -83,7 +76,7 @@ class Kinetix_mp(Kinetix):
             key = cv2.waitKey(1) & 0xFF
 
             if key == ord("q"): break
-            if key in keymap: group_plot = keymap[key]
+            if key in self.keymap: group_plot = self.keymap[key]
 
             frame_index += 1
 

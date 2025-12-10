@@ -37,13 +37,6 @@ class Kinetix_Yolo(Kinetix):
         prev_time = time.time()
         previous_message = {}
 
-        # Group selection shortcuts
-        keymap = {
-            ord('l'): ['r_arm', 'r_leg', 'l_arm', 'l_leg'],
-            ord('w'): ['whole', 'upper', 'lower'],
-            ord('b'): self.group_names
-        }
-
         while True:
             success, current_frame = cap.read()
             if not success:
@@ -125,7 +118,7 @@ class Kinetix_Yolo(Kinetix):
             key = cv2.waitKey(1) & 0xFF
             
             if key == ord("q"): break
-            if key in keymap: group_plot = keymap[key]
+            if key in self.keymap: group_plot = self.keymap[key]
 
             frame_index += 1
 
