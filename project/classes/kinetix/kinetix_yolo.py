@@ -1,3 +1,5 @@
+import copy
+
 import cv2
 import numpy as np
 import time
@@ -16,6 +18,7 @@ class Kinetix_Yolo(Kinetix):
         self.prev_p_dict = {}
         self.scale_factors_dict = {}
         self.last_world_kpts_dict = {}
+        self.person_filters = {}
 
     # Main execution loop for YOLO-based tracking and KE computation
     def __call__(self, detector, filters, cap, max_ke, use_anthropometric_tables=False):
@@ -73,8 +76,14 @@ class Kinetix_Yolo(Kinetix):
                     # 1. Convert to approximate world coordinates (specific per ID)
                     world_kpts = self.yolo_to_world_approx_id(kpts_person, track_id, subject_height_m=self.sub_height)
 
-                    # 2. Compute kinetic energy (specific per ID)
-                    ke_person = self.compute_components_ke(world_kpts, dt, masses_dict, filters, track_id)
+                    # 2. Manage filter for each person (track-id)
+                    if track_id not in self.person_filters and filters is not None:
+                        self.person_filters[track_id] = [copy.deepcopy(f) for f in filters]
+                    current_person_filters = self.person_filters.get(track_id, None)
+
+                    # 3. Compute kinetic energy (specific per ID)
+                    ke_person = self.compute_components_ke(world_kpts, dt, masses_dict, current_person_filters,
+                                                           track_id)
 
                     frame_ke_data[track_id] = ke_person
 

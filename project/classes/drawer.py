@@ -9,12 +9,13 @@ class Drawer:
     def __init__(self):
         # Color palette for different IDs (BGR)
         self.colors = [
+            (0, 0, 0),      # Black
             (0, 122, 255),  # Orange
-            (0, 255, 0),    # Green
             (255, 0, 0),    # Blue
-            (0, 255, 255),  # Yellow
+            (0, 200, 255),  # Yellow
             (255, 0, 255),  # Magenta
-            (255, 255, 0)   # Cyan
+            (255, 255, 0),  # Cyan
+            (0, 255, 0)     # Green
         ]
 
     def __call__(self, ke, max_ke, message, group_plot, frame=None, detection=None, annotated_image=None, model=None):
@@ -196,7 +197,6 @@ class Drawer:
 
                 cv2.rectangle(graph, (x1, y1), (x2, y2), color, -1)
 
-                # --- MODIFICATION: Value display ---
                 if bar_width > 10:  # Write only if the bar is wide enough
                     value_text = f"{ke_val:.1f}"
 
