@@ -9,7 +9,7 @@ from mediapipe.tasks.python import vision
 from classes.body_landmarks import BodyLandmarks, YoloBodyLandmarks, YoloBodyLandmarkGroups, BodyLandmarkGroups
 
 # Filters
-from classes.filters import ButterworthMultichannel, HampelMultichannel, SavitzkyGolayMultichannel
+from classes.filters import ButterworthMultichannel
 
 # Utilities and data structures
 from classes.kinetix.kinetix_mp import Kinetix_mp
