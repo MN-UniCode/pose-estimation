@@ -27,7 +27,7 @@ sub_height_m = 1.75
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "nico.MOV"
+video_name = "3_people.mp4"
 live_input = False
 
 # Filtering
@@ -39,7 +39,6 @@ plot_window_seconds = 5
 max_ke = 12.0
 
 os.environ["QT_QPA_PLATFORM"] = "xcb"
-
 
 
 # === Pre-processing === #
@@ -80,17 +79,20 @@ What motion tracking model do you want to use?:
 
         landmarks = BodyLandmarks
         landmark_groups  = BodyLandmarkGroups
-        kinetix = Kinetix_mp(fps, plot_window_seconds, total_mass, landmark_groups, sub_height_m)
+        kinetix = Kinetix_mp(fps, plot_window_seconds, total_mass, landmark_groups)
         break
+
     elif result == "2":
         detector = YOLO(model_path + "yolo11n-pose.pt")
 
         landmarks = YoloBodyLandmarks
         landmark_groups  = YoloBodyLandmarkGroups
-        kinetix = Kinetix_Yolo(fps, plot_window_seconds, total_mass, landmark_groups)
+        kinetix = Kinetix_Yolo(fps, plot_window_seconds, total_mass, landmark_groups, sub_height_m)
         break
+
     elif result == "q":
         sys.exit()
+
     else:
         print("Please enter a valid option.")
 
@@ -98,11 +100,9 @@ What motion tracking model do you want to use?:
 num_channels = len(landmarks) * 3
 
 hampel_filter = HampelMultichannel(num_channels, window_size=11, n_sigma=2.5, replace_with='median')
-
 butterworth_filter = ButterworthMultichannel(num_channels, order, cutoff, btype='lowpass', fs=fps)
-
 savgol_vel_filter = SavitzkyGolayMultichannel(num_channels, window_length=9, polyorder=2, deriv=1, delta=delta_t)
 
 filters = [butterworth_filter]
 
-kinetix(detector, filters, cap, max_ke, use_anthropometric_tables, sub_height_m)
+kinetix(detector, filters, cap, max_ke, use_anthropometric_tables)
