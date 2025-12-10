@@ -1,11 +1,100 @@
-# multimodal-systems
+# Multimodal Motion Tracking & Pose Estimation
 
-| TO-DO                                      | Status |
-|--------------------------------------------|--------|
-| Commentare codice                          |        |
-| Migliorare codice                          |        |
-| Provare con nuovi video                    |        |
-| Provare video multi persona con YOLO       |        |
-| Fare qualche analisi e approfondire codice |        |
-| SavitzkyGolay filter multichannel          |        |
-| Studiare filtri                            |        |
+This project provides a multimodal system for motion tracking and human pose estimation using video input or live camera streaming. It computes the **kinetic energy** of people detected in the scene and visualizes results through histograms. 
+
+Energy metrics are computed for:
+
+* **Whole body**
+* **Upper body**
+* **Lower body**
+* **Left arm**
+* **Right arm**
+* **Left leg**
+* **Right leg**
+
+The system supports both **Mediapipe** (single-person) and **YOLO** (multi-person) pose estimation models.
+
+---
+
+## Features
+
+* Multimodal pose estimation pipeline.
+* Support for video files from the [dataset](./project/videos) or live camera streaming.
+* Kinetic energy computation for different body regions.
+* Histogram visualization of kinetic energy over time.
+* Automated environment setup via [setup.sh](./setup.sh).
+
+---
+
+## Installation
+
+Make the setup script executable and run it:
+
+```bash
+chmod +x setup.sh
+./setup.sh
+```
+
+This will:
+
+* Create a Python virtual environment.
+* Install all required dependencies.
+
+---
+
+## Requirements
+
+* Python 3.10
+* [requirements.txt](./requirements.txt)
+
+All dependencies are automatically installed via [`setup.sh`](./setup.sh).
+
+---
+
+## Usage
+
+### 1. Choose Input Source
+
+Edit the configuration in [`project/main`](./project/main.py) to select:
+
+* A **video** from the dataset, or
+* **Live camera streaming** by setting:
+
+```python
+live_input = True
+```
+
+### 2. Adjust Physical Parameters
+
+You can modify the person's weight and height in [`project/main`](./project/main.py) for more accurate kinetic energy estimation:
+
+```python
+total_mass = 67      # Person's mass in kg
+sub_height_m = 1.75  # Person's height in meters
+```
+
+If using multi-person YOLO tracking, it is recommended to set average weight and average height values.
+
+### 3. Run the Project
+
+Execute the main program:
+
+```bash
+python3 project/main
+```
+
+When prompted, select the pose estimation backend:
+
+* Press **1** for **Mediapipe** (single-person tracking)
+* Press **2** for **YOLO** (multi-person tracking)
+
+---
+
+## Output
+
+The system will display:
+
+* The pose estimation visualization.
+* Computed kinetic energy values.
+* A histogram representing kinetic energy distribution across different body parts.
+* A message indicating which limb is moving the most, for each detected person.

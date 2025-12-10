@@ -47,41 +47,7 @@ else
     echo -e "${RED}Attention: requirements.txt not found! Skip this step.${NC}"
 fi
 
-# 5. Installation SAM 2
-#echo -e "${BLUE}Check SAM 2 installation...${NC}"
-#
-#if [ -d "sam2" ]; then
-#    echo -e "${GREEN}✔ sam2 folder already present. Executing git pull to update...${NC}"
-#    cd sam2
-#    git pull
-#else
-#    echo -e "${BLUE}Cloning repository SAM 2...${NC}"
-#    git clone https://github.com/facebookresearch/sam2.git
-#    cd sam2
-#fi
-#
-#echo -e "${BLUE}Installing package SAM 2 (pip install -e .)...${NC}"
-#mkdir -p ~/tmp_build
-#TMPDIR=~/tmp_build pip install -e .
-#rm -rf ~/tmp_build
-
-# 6. Download Checkpoints
-echo -e "${BLUE}Checkpoints download...${NC}"
-
-if [ -d "checkpoints" ]; then
-    cd checkpoints
-
-    if [ -f "download_ckpts.sh" ]; then
-        chmod +x download_ckpts.sh
-        ./download_ckpts.sh
-    else
-        echo -e "${RED}Error: download_ckpts.sh not found in sam2/checkpoints!${NC}"
-    fi
-else
-    echo -e "${RED}Error: Folder checkpoints not found in sam2!${NC}"
-fi
-
-# 7. Back to Project Root
+# 5. Back to Project Root
 cd "$PROJECT_ROOT"
 
 echo -e "${GREEN}=== Setup Completed Successfully! ===${NC}"
