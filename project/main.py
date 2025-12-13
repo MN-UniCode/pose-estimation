@@ -27,7 +27,7 @@ sub_height_m = 1.75
 base_path = ""
 video_path = "project/videos/"
 model_path = "project/models/"
-video_name = "micro-dance.avi"
+video_name = "3_people.mp4"
 live_input = False
 
 # Filtering

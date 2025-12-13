@@ -126,7 +126,7 @@ class Kinetix_Yolo(Kinetix):
         cv2.destroyAllWindows()
 
     # Compute kinetic energy for all tracked body components
-    def compute_components_ke(self, detection, dt, masses_dict, filters=None, track_id=None, max_speed=1):
+    def compute_components_ke(self, detection, dt, masses_dict, filters=None, track_id=None, max_speed=10):
         ke = {f"{name}_ke": 0.0 for name in self.group_names}
 
         if detection is None:
